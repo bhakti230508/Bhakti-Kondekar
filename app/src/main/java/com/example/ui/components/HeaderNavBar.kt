@@ -44,33 +44,16 @@ fun HeaderNavBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Brand Logo
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // Official FROMCHEM Brand Logo
+            Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .clickable { onTabSelected("Services") }
+                    .padding(vertical = 2.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(FromchemPrimaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Science,
-                        contentDescription = "Fromchem Logo",
-                        tint = FromchemPrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Fromchem Solution",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FromchemTextPrimary
+                FromchemBrandLogo(
+                    compact = !isDesktopMode,
+                    showSubtext = isDesktopMode
                 )
             }
 

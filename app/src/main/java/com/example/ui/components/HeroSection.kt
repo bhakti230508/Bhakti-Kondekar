@@ -75,6 +75,21 @@ private fun HeroTextContent(
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Brand Logo Banner
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .border(1.dp, FromchemBorder, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            FromchemBrandLogo(
+                showSubtext = true,
+                compact = false
+            )
+        }
+
         // Top ISO Badge
         Box(
             modifier = Modifier
@@ -94,7 +109,7 @@ private fun HeroTextContent(
                     modifier = Modifier.size(14.dp)
                 )
                 Text(
-                    text = "ISO CERTIFIED CHEMICALS",
+                    text = "ISO 9001:2015 CERTIFIED CHEMICALS",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = FromchemPrimary,

@@ -52,6 +52,7 @@ fun FromchemApp() {
     var selectedTab by remember { mutableStateOf("Services") }
     var showQuoteModal by remember { mutableStateOf(false) }
     var showChatModal by remember { mutableStateOf(false) }
+    var showContactModal by remember { mutableStateOf(false) }
     var selectedCardForLearnMore by remember { mutableStateOf<String?>(null) }
 
     val scrollState = rememberScrollState()
@@ -100,7 +101,11 @@ fun FromchemApp() {
                     selectedTab = selectedTab,
                     onTabSelected = { tab ->
                         selectedTab = tab
-                        Toast.makeText(context, "Navigated to $tab", Toast.LENGTH_SHORT).show()
+                        if (tab == "Contact") {
+                            showContactModal = true
+                        } else {
+                            Toast.makeText(context, "Navigated to $tab", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     onGetQuoteClicked = { showQuoteModal = true },
                     isDesktopMode = isDesktopViewOverride,
@@ -156,23 +161,61 @@ fun FromchemApp() {
                             isWideScreen = isDesktopViewOverride
                         )
 
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // 4. Contact Us Inquiry Form Section
+                        ContactUsSection(
+                            isWideScreen = isDesktopViewOverride,
+                            onInquirySubmitted = { form, id ->
+                                Toast.makeText(context, "Inquiry #$id received from ${form.fullName}", Toast.LENGTH_LONG).show()
+                            }
+                        )
+
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // 4. Footer Section
+                        // 5. Footer Section
                         FooterSection(
                             onLinkClick = { link ->
-                                Toast.makeText(context, "Opening $link", Toast.LENGTH_SHORT).show()
+                                if (link == "Contact") {
+                                    showContactModal = true
+                                } else {
+                                    Toast.makeText(context, "Opening $link", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             onEmailClick = {
-                                showQuoteModal = true
+                                try {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
+                                        data = android.net.Uri.parse("mailto:fromchem6@gmail.com")
+                                        putExtra(android.content.Intent.EXTRA_SUBJECT, "Inquiry regarding Fromchem Waterproofing Services")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    showContactModal = true
+                                    Toast.makeText(context, "Owner Email: fromchem6@gmail.com", Toast.LENGTH_LONG).show()
+                                }
                             },
                             onPhoneClick = {
-                                Toast.makeText(context, "Fromchem Solution Line: +1 (800) 555-CHEM", Toast.LENGTH_LONG).show()
+                                try {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:+919727751868"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Fromchem Hotline: +91 97277 51868", Toast.LENGTH_LONG).show()
+                                }
                             },
                             isWideScreen = isDesktopViewOverride
                         )
                     }
                 }
+            }
+
+            // Interactive Modals & Dialogs
+            if (showContactModal) {
+                ContactUsDialog(
+                    onDismiss = { showContactModal = false },
+                    onInquirySubmitted = { form, id ->
+                        Toast.makeText(context, "Inquiry #$id received from ${form.fullName}", Toast.LENGTH_LONG).show()
+                    }
+                )
             }
 
             // Interactive Modals & Dialogs

@@ -2,19 +2,24 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val FromchemPrimary = Color(0xFF6750A4)
-val FromchemPrimaryDark = Color(0xFF4F378B)
-val FromchemPrimaryContainer = Color(0xFFEADDFF)
-val FromchemOnPrimaryContainer = Color(0xFF21005D)
+// FROMCHEM Brand Palette (Industrial Chemical Solutions)
+val FromchemPrimary = Color(0xFF0251EE) // Electric Royal Blue ("FROMCHEM", "Waterproofing")
+val FromchemPrimaryDark = Color(0xFF0038C4)
+val FromchemPrimaryContainer = Color(0xFFEFF6FF) // Crisp Light Ice Tint
+val FromchemOnPrimaryContainer = Color(0xFF1E3A8A)
 
-val FromchemBackground = Color(0xFFFDF7FF)
+val FromchemSecondaryRed = Color(0xFFE52521) // Industrial Chemical Red ("SOLUTIONS", "Construction")
+val FromchemAccentGreen = Color(0xFF10B981) // Chemical Green ("&", Crystalline Seal)
+val FromchemAccentYellow = Color(0xFFF59E0B) // Construction Gold ("Chemicals", Warranty)
+
+val FromchemBackground = Color(0xFFF8FAFC) // Industrial Slate Clean Canvas
 val FromchemSurface = Color(0xFFFFFFFF)
-val FromchemSurfaceVariant = Color(0xFFF7F2FA)
+val FromchemSurfaceVariant = Color(0xFFF1F5F9) // Steel Tint Surface
 
-val FromchemTextPrimary = Color(0xFF1C1B1F)
-val FromchemTextSecondary = Color(0xFF49454F)
-val FromchemTextMuted = Color(0xFF79747E)
+val FromchemTextPrimary = Color(0xFF0F172A) // Slate Black Typography
+val FromchemTextSecondary = Color(0xFF475569) // Muted Slate
+val FromchemTextMuted = Color(0xFF94A3B8)
 
-val FromchemAccentRed = Color(0xFFB3261E)
-val FromchemAccentGreen = Color(0xFF2E7D32)
-val FromchemBorder = Color(0xFFCAC4D0)
+val FromchemAccentRed = Color(0xFFE52521)
+val FromchemBorder = Color(0xFFE2E8F0)
+

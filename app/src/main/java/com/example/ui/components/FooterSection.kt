@@ -49,15 +49,10 @@ fun FooterSection(
                 ) {
                     // Left Brand & Copyright
                     Column {
+                        FromchemBrandLogo(compact = true, showSubtext = true)
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Fromchem Solution",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = FromchemTextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "© 2024 Fromchem Solution. All rights reserved.",
+                            text = "© 2024 Fromchem Solutions. All rights reserved.",
                             fontSize = 11.sp,
                             color = FromchemTextSecondary
                         )
@@ -78,43 +73,62 @@ fun FooterSection(
                         }
                     }
 
-                    // Right Social Action Buttons
+                    // Right Social Action Buttons & Phone Number
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = onEmailClick,
-                            modifier = Modifier
-                                .testTag("footer_email_button")
-                                .size(36.dp)
-                                .shadow(2.dp, CircleShape)
-                                .clip(CircleShape)
-                                .background(FromchemPrimaryContainer)
+                        Surface(
+                            onClick = onPhoneClick,
+                            shape = CircleShape,
+                            color = FromchemPrimaryContainer,
+                            shadowElevation = 2.dp
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Email,
-                                contentDescription = "Email Us",
-                                tint = FromchemPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Phone,
+                                    contentDescription = "Call Us",
+                                    tint = FromchemPrimary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = "+91 97277 51868",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = FromchemPrimary
+                                )
+                            }
                         }
 
-                        IconButton(
-                            onClick = onPhoneClick,
-                            modifier = Modifier
-                                .testTag("footer_phone_button")
-                                .size(36.dp)
-                                .shadow(2.dp, CircleShape)
-                                .clip(CircleShape)
-                                .background(FromchemPrimaryContainer)
+                        Surface(
+                            onClick = onEmailClick,
+                            shape = CircleShape,
+                            color = FromchemPrimaryContainer,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.testTag("footer_email_button")
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Phone,
-                                contentDescription = "Call Us",
-                                tint = FromchemPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = "Email Us",
+                                    tint = FromchemPrimary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = "fromchem6@gmail.com",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = FromchemPrimary
+                                )
+                            }
                         }
                     }
                 }
@@ -124,12 +138,7 @@ fun FooterSection(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "Fromchem Solution",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = FromchemTextPrimary
-                    )
+                    FromchemBrandLogo(compact = true, showSubtext = true)
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -149,38 +158,57 @@ fun FooterSection(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = onEmailClick,
-                            modifier = Modifier
-                                .testTag("footer_email_button")
-                                .size(38.dp)
-                                .shadow(2.dp, CircleShape)
-                                .clip(CircleShape)
-                                .background(FromchemPrimaryContainer)
+                        Surface(
+                            onClick = onPhoneClick,
+                            shape = CircleShape,
+                            color = FromchemPrimaryContainer,
+                            shadowElevation = 2.dp
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Email,
-                                contentDescription = "Email Us",
-                                tint = FromchemPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Phone,
+                                    contentDescription = "Call Us",
+                                    tint = FromchemPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "+91 97277 51868",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = FromchemPrimary
+                                )
+                            }
                         }
 
-                        IconButton(
-                            onClick = onPhoneClick,
-                            modifier = Modifier
-                                .testTag("footer_phone_button")
-                                .size(38.dp)
-                                .shadow(2.dp, CircleShape)
-                                .clip(CircleShape)
-                                .background(FromchemPrimaryContainer)
+                        Surface(
+                            onClick = onEmailClick,
+                            shape = CircleShape,
+                            color = FromchemPrimaryContainer,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.testTag("footer_email_button")
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Phone,
-                                contentDescription = "Call Us",
-                                tint = FromchemPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = "Email Us",
+                                    tint = FromchemPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "fromchem6@gmail.com",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = FromchemPrimary
+                                )
+                            }
                         }
                     }
 
