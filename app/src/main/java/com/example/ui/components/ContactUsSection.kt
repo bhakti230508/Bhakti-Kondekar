@@ -491,7 +491,7 @@ fun ContactUsSection(
                         onValueChange = {
                             formState = formState.copy(phone = it, phoneError = null)
                         },
-                        label = { Text("Phone Number (Optional)") },
+                        label = { Text("Phone Number") },
                         placeholder = { Text("e.g. +1 (555) 019-2834") },
                         isError = formState.phoneError != null,
                         supportingText = {
