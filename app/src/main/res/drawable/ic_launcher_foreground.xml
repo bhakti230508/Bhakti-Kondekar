@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="18"
+        android:translateY="18">
+        <!-- Shield Background -->
+        <path
+            android:fillColor="#4F46E5"
+            android:pathData="M36,6 L12,16 V36 C12,52 22,64 36,70 C50,64 60,52 60,36 V16 L36,6 Z" />
+        <!-- Chemical Beaker / Water Droplet cutout inside -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M36,22 C36,22 26,36 26,43 C26,48.5 30.5,53 36,53 C41.5,53 46,48.5 46,43 C46,36 36,22 36,22 Z M36,49 C32.7,49 30,46.3 30,43 C30,39.5 34,31 36,27.5 C38,31 42,39.5 42,43 C42,46.3 39.3,49 36,49 Z" />
+    </group>
+</vector>
