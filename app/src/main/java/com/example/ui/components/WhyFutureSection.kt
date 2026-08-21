@@ -155,7 +155,7 @@ private fun WhyFutureTextContent() {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Why Chemical Waterproofing is the Future .",
+            text = "Why Chemical Waterproofing is the Future ? .",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = FromchemTextPrimary,

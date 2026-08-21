@@ -2,11 +2,14 @@ package com.example.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -22,10 +25,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.PhotoCamera
+
 @Composable
 fun HeroSection(
     onExploreSolutionsClicked: () -> Unit,
     onViewCaseStudiesClicked: () -> Unit,
+    onAiCameraScanClicked: () -> Unit = {},
     isWideScreen: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -44,7 +51,8 @@ fun HeroSection(
                 Column(modifier = Modifier.weight(1f)) {
                     HeroTextContent(
                         onExploreSolutionsClicked = onExploreSolutionsClicked,
-                        onViewCaseStudiesClicked = onViewCaseStudiesClicked
+                        onViewCaseStudiesClicked = onViewCaseStudiesClicked,
+                        onAiCameraScanClicked = onAiCameraScanClicked
                     )
                 }
                 // Right Hero Graphic
@@ -59,7 +67,8 @@ fun HeroSection(
             ) {
                 HeroTextContent(
                     onExploreSolutionsClicked = onExploreSolutionsClicked,
-                    onViewCaseStudiesClicked = onViewCaseStudiesClicked
+                    onViewCaseStudiesClicked = onViewCaseStudiesClicked,
+                    onAiCameraScanClicked = onAiCameraScanClicked
                 )
                 HeroWorkerGraphic()
             }
@@ -70,51 +79,42 @@ fun HeroSection(
 @Composable
 private fun HeroTextContent(
     onExploreSolutionsClicked: () -> Unit,
-    onViewCaseStudiesClicked: () -> Unit
+    onViewCaseStudiesClicked: () -> Unit,
+    onAiCameraScanClicked: () -> Unit
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Brand Logo Banner
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White)
-                .border(1.dp, FromchemBorder, RoundedCornerShape(16.dp))
-                .padding(16.dp)
+        // Top ISO Badge & AI Leak Inspector Badge
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            FromchemBrandLogo(
-                showSubtext = true,
-                compact = false
-            )
-        }
-
-        // Top ISO Badge
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(FromchemPrimaryContainer)
-                .border(1.dp, FromchemBorder, RoundedCornerShape(20.dp))
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(FromchemPrimaryContainer)
+                    .border(1.dp, FromchemBorder, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Verified,
-                    contentDescription = "ISO Certified",
-                    tint = FromchemPrimary,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = "ISO 9001:2015 CERTIFIED CHEMICALS",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FromchemPrimary,
-                    letterSpacing = 0.5.sp
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Verified,
+                        contentDescription = "ISO Certified",
+                        tint = FromchemPrimary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "ISO 9001:2015 CERTIFIED",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FromchemPrimary,
+                        letterSpacing = 0.5.sp
+                    )
+                }
             }
         }
 
@@ -148,7 +148,82 @@ private fun HeroTextContent(
             lineHeight = 22.sp
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        // AI Camera Leak Scanner Hero Banner CTA Card
+        Surface(
+            onClick = onAiCameraScanClicked,
+            shape = RoundedCornerShape(16.dp),
+            color = FromchemPrimaryContainer,
+            border = androidx.compose.foundation.BorderStroke(1.dp, FromchemPrimary.copy(alpha = 0.3f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("hero_ai_camera_banner")
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = FromchemPrimary,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = "AI Camera Leak Inspector",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "AI Leak Detector Camera",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = FromchemPrimary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = FromchemAccentGreen
+                            ) {
+                                Text(
+                                    text = "NEW",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = "Snap wall cracks, ceiling leaks, dampness, terrace or basement",
+                            fontSize = 11.sp,
+                            color = FromchemTextSecondary
+                        )
+                    }
+                }
+
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = "Scan Now",
+                    tint = FromchemPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Action Buttons Row
         Row(

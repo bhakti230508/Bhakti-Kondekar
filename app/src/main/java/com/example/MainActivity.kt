@@ -11,7 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,6 +53,10 @@ fun FromchemApp() {
     var showQuoteModal by remember { mutableStateOf(false) }
     var showChatModal by remember { mutableStateOf(false) }
     var showContactModal by remember { mutableStateOf(false) }
+    var showLoginModal by remember { mutableStateOf(false) }
+    var showProfileModal by remember { mutableStateOf(false) }
+    var showAiCameraModal by remember { mutableStateOf(false) }
+    var currentUser by remember { mutableStateOf<UserProfile?>(null) }
     var selectedCardForLearnMore by remember { mutableStateOf<String?>(null) }
 
     val scrollState = rememberScrollState()
@@ -72,15 +76,15 @@ fun FromchemApp() {
                     .testTag("floating_ai_chat_button")
             ) {
                 Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = "AI Assistant",
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Voice & AI Support Chat",
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "AI Chat",
+                    text = "Voice & AI Chat",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
+                    fontSize = 13.sp
                 )
             }
         }
@@ -113,6 +117,17 @@ fun FromchemApp() {
                         isDesktopViewOverride = !isDesktopViewOverride
                         val modeName = if (isDesktopViewOverride) "Desktop Web Layout" else "Android Mobile Layout"
                         Toast.makeText(context, "Switched to $modeName", Toast.LENGTH_SHORT).show()
+                    },
+                    currentUser = currentUser,
+                    onAccountClicked = {
+                        if (currentUser == null) {
+                            showLoginModal = true
+                        } else {
+                            showProfileModal = true
+                        }
+                    },
+                    onAiCameraClicked = {
+                        showAiCameraModal = true
                     }
                 )
 
@@ -135,6 +150,9 @@ fun FromchemApp() {
                                 selectedTab = "Projects"
                                 Toast.makeText(context, "Opening Waterproofing Case Studies", Toast.LENGTH_SHORT).show()
                             },
+                            onAiCameraScanClicked = {
+                                showAiCameraModal = true
+                            },
                             isWideScreen = isDesktopViewOverride
                         )
 
@@ -153,7 +171,18 @@ fun FromchemApp() {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // 3. Why Chemical Waterproofing is the Future Section
+                        // 3. Project Photo Gallery Section
+                        ProjectGallerySection(
+                            onGetQuoteForProject = { projectTitle ->
+                                showQuoteModal = true
+                                Toast.makeText(context, "Requesting Quote for $projectTitle", Toast.LENGTH_SHORT).show()
+                            },
+                            isWideScreen = isDesktopViewOverride
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // 4. Why Chemical Waterproofing is the Future Section
                         WhyFutureSection(
                             onFeatureClicked = { featureName ->
                                 Toast.makeText(context, "$featureName: ISO Certified Chemical Compound", Toast.LENGTH_SHORT).show()
@@ -238,6 +267,44 @@ fun FromchemApp() {
                 LearnMoreDialog(
                     cardTitle = title,
                     onDismiss = { selectedCardForLearnMore = null }
+                )
+            }
+
+            if (showLoginModal) {
+                LoginDialog(
+                    onDismiss = { showLoginModal = false },
+                    onLoginSuccess = { user ->
+                        currentUser = user
+                        showLoginModal = false
+                        Toast.makeText(context, "Welcome to Fromchem Portal, ${user.fullName}!", Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+
+            if (showProfileModal && currentUser != null) {
+                UserProfileDialog(
+                    user = currentUser!!,
+                    onDismiss = { showProfileModal = false },
+                    onLogout = {
+                        currentUser = null
+                        showProfileModal = false
+                        Toast.makeText(context, "Signed out successfully", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+
+            if (showAiCameraModal) {
+                AiLeakScannerDialog(
+                    onDismiss = { showAiCameraModal = false },
+                    onRequestInspection = { issue, solution ->
+                        showQuoteModal = true
+                        Toast.makeText(
+                            context,
+                            "AI Diagnostic ($issue) attached to Quote Request!",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    },
+                    currentUser = currentUser
                 )
             }
         }
