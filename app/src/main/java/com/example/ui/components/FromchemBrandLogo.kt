@@ -3,159 +3,234 @@ package com.example.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 
 /**
- * 3D Chemical Molecular Node Mark as seen in the FROMCHEM SOLUTIONS brand logo.
+ * Official Chemistry Laboratory Flask mark for FROMCHEM SOLUTION:
+ * Features burgundy outer contour, navy inner structure, dark blue chemical liquid,
+ * and yellow/amber letter 'F' in the center.
  */
 @Composable
-fun MoleculeLogoMark(
+fun FromchemFlaskMark(
     modifier: Modifier = Modifier,
-    size: Dp = 44.dp
+    height: Dp = 44.dp
 ) {
-    Canvas(modifier = modifier.size(size)) {
-        val w = size.toPx()
-        val h = size.toPx()
+    val width = height * 0.92f
 
-        // Center coordinates for spheres
-        val centerGreen = Offset(w * 0.45f, h * 0.48f)
-        val topBlue = Offset(w * 0.82f, h * 0.20f)
-        val leftRed = Offset(w * 0.16f, h * 0.38f)
-        val bottomYellow = Offset(w * 0.38f, h * 0.82f)
+    Canvas(
+        modifier = modifier
+            .size(width = width, height = height)
+            .semantics { contentDescription = "Fromchem Laboratory Flask Logo" }
+    ) {
+        val w = size.width
+        val h = size.height
+        val centerX = w * 0.48f
 
-        val bondWidth = w * 0.10f
+        // Geometry dimensions
+        val lipWidth = w * 0.36f
+        val lipHeight = h * 0.08f
+        val neckWidth = w * 0.24f
+        val neckTopY = h * 0.07f
+        val neckBottomY = h * 0.32f
+        val baseLeftX = w * 0.10f
+        val baseRightX = w * 0.88f
+        val baseY = h * 0.92f
+        val liquidSurfaceY = h * 0.54f
 
-        // Draw chemical bond connectors
+        val strokeWidth = (w * 0.07f).coerceAtLeast(2.5f)
+
+        // 1. Draw Liquid Fill inside Lower Flask Body
+        val liquidPath = Path().apply {
+            // Calculate X coordinates at liquid surface height based on conical slope
+            val leftSlope = (baseLeftX - (centerX - neckWidth / 2)) / (baseY - neckBottomY)
+            val rightSlope = (baseRightX - (centerX + neckWidth / 2)) / (baseY - neckBottomY)
+            val liquidLeftX = (centerX - neckWidth / 2) + leftSlope * (liquidSurfaceY - neckBottomY)
+            val liquidRightX = (centerX + neckWidth / 2) + rightSlope * (liquidSurfaceY - neckBottomY)
+
+            moveTo(liquidLeftX, liquidSurfaceY)
+            lineTo(liquidRightX, liquidSurfaceY)
+            lineTo(baseRightX - w * 0.04f, baseY - h * 0.04f)
+            // Rounded bottom right
+            quadraticTo(baseRightX, baseY, baseRightX - w * 0.08f, baseY)
+            lineTo(baseLeftX + w * 0.08f, baseY)
+            // Rounded bottom left
+            quadraticTo(baseLeftX, baseY, baseLeftX + w * 0.04f, baseY - h * 0.04f)
+            lineTo(liquidLeftX, liquidSurfaceY)
+            close()
+        }
+
+        drawPath(
+            path = liquidPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(FromchemFlaskLiquid, Color(0xFF091F38)),
+                startY = liquidSurfaceY,
+                endY = baseY
+            )
+        )
+
+        // 2. Yellow/Gold Letter 'F' inside the chemical liquid
+        val fStartX = centerX - w * 0.08f
+        val fTopY = h * 0.62f
+        val fBottomY = h * 0.84f
+        val fArmWidth = w * 0.16f
+        val fMidArmWidth = w * 0.11f
+        val fMidY = h * 0.72f
+        val fStrokeWidth = (w * 0.08f).coerceAtLeast(3f)
+
+        // Vertical stem of F
         drawLine(
-            color = Color(0xFF10B981),
-            start = centerGreen,
-            end = topBlue,
-            strokeWidth = bondWidth,
-            cap = StrokeCap.Round
+            color = FromchemAmberGold,
+            start = Offset(fStartX, fTopY),
+            end = Offset(fStartX, fBottomY),
+            strokeWidth = fStrokeWidth,
+            cap = StrokeCap.Square
         )
+        // Top horizontal arm of F
         drawLine(
-            color = Color(0xFFE52521),
-            start = centerGreen,
-            end = leftRed,
-            strokeWidth = bondWidth,
-            cap = StrokeCap.Round
+            color = FromchemAmberGold,
+            start = Offset(fStartX, fTopY + fStrokeWidth / 2),
+            end = Offset(fStartX + fArmWidth, fTopY + fStrokeWidth / 2),
+            strokeWidth = fStrokeWidth,
+            cap = StrokeCap.Square
         )
+        // Middle horizontal arm of F
         drawLine(
-            color = Color(0xFFF59E0B),
-            start = centerGreen,
-            end = bottomYellow,
-            strokeWidth = bondWidth,
+            color = FromchemAmberGold,
+            start = Offset(fStartX, fMidY),
+            end = Offset(fStartX + fMidArmWidth, fMidY),
+            strokeWidth = fStrokeWidth,
+            cap = StrokeCap.Square
+        )
+
+        // 3. Flask Outer Contour (Deep Burgundy Red)
+        val outerFlaskPath = Path().apply {
+            // Start at neck top left
+            moveTo(centerX - neckWidth / 2, neckTopY)
+            lineTo(centerX - neckWidth / 2, neckBottomY)
+            lineTo(baseLeftX, baseY - h * 0.04f)
+            quadraticTo(baseLeftX, baseY, baseLeftX + w * 0.08f, baseY)
+            lineTo(baseRightX - w * 0.08f, baseY)
+            quadraticTo(baseRightX, baseY, baseRightX, baseY - h * 0.04f)
+            lineTo(centerX + neckWidth / 2, neckBottomY)
+            lineTo(centerX + neckWidth / 2, neckTopY)
+        }
+
+        drawPath(
+            path = outerFlaskPath,
+            color = FromchemBurgundy,
+            style = Stroke(
+                width = strokeWidth,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+
+        // 4. Flask Top Lip (Burgundy & Navy Accent)
+        drawRoundRect(
+            color = FromchemBurgundy,
+            topLeft = Offset(centerX - lipWidth / 2, h * 0.02f),
+            size = Size(lipWidth, lipHeight),
+            cornerRadius = CornerRadius(lipHeight / 2, lipHeight / 2)
+        )
+        drawRoundRect(
+            color = FromchemNavy,
+            topLeft = Offset(centerX - lipWidth / 2 + strokeWidth / 2, h * 0.02f + strokeWidth / 4),
+            size = Size(lipWidth - strokeWidth, lipHeight - strokeWidth / 2),
+            cornerRadius = CornerRadius(lipHeight / 3, lipHeight / 3)
+        )
+
+        // 5. Inner Glass Sheen / Reflection on left wall
+        drawLine(
+            color = Color.White.copy(alpha = 0.55f),
+            start = Offset(baseLeftX + w * 0.06f, baseY - h * 0.08f),
+            end = Offset(centerX - neckWidth / 2 + w * 0.02f, neckBottomY + h * 0.04f),
+            strokeWidth = strokeWidth * 0.45f,
             cap = StrokeCap.Round
-        )
-
-        // Draw spheres with 3D gradient look
-        // 1. Blue Top Sphere
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color(0xFF60A5FA), Color(0xFF0251EE), Color(0xFF1E40AF)),
-                center = topBlue - Offset(w * 0.05f, h * 0.05f),
-                radius = w * 0.22f
-            ),
-            radius = w * 0.20f,
-            center = topBlue
-        )
-
-        // 2. Red Left Sphere
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color(0xFFF87171), Color(0xFFE52521), Color(0xFF991B1B)),
-                center = leftRed - Offset(w * 0.04f, h * 0.04f),
-                radius = w * 0.18f
-            ),
-            radius = w * 0.16f,
-            center = leftRed
-        )
-
-        // 3. Yellow Bottom Sphere
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color(0xFFFDE047), Color(0xFFF59E0B), Color(0xFFB45309)),
-                center = bottomYellow - Offset(w * 0.04f, h * 0.04f),
-                radius = w * 0.18f
-            ),
-            radius = w * 0.16f,
-            center = bottomYellow
-        )
-
-        // 4. Central Green Sphere
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color(0xFF34D399), Color(0xFF10B981), Color(0xFF065F46)),
-                center = centerGreen - Offset(w * 0.04f, h * 0.04f),
-                radius = w * 0.18f
-            ),
-            radius = w * 0.16f,
-            center = centerGreen
         )
     }
 }
 
 /**
- * Multi-colored Shield Icon representing waterproofing protection.
+ * Custom Letter 'O' containing the glowing amber chemical droplet,
+ * replicating the official FROMCHEM wordmark.
  */
 @Composable
-fun WaterproofShieldIcon(
-    modifier: Modifier = Modifier,
-    size: Dp = 18.dp
+fun DropletLetterO(
+    size: Dp = 16.dp,
+    textColor: Color = FromchemNavy
 ) {
-    Canvas(modifier = modifier.size(size)) {
-        val w = size.toPx()
-        val h = size.toPx()
+    Canvas(modifier = Modifier.size(size)) {
+        val s = this.size.minDimension
+        val strokeW = s * 0.18f
+        val center = Offset(s / 2, s / 2)
 
-        val path = Path().apply {
-            moveTo(w * 0.5f, 0f)
-            lineTo(w, h * 0.25f)
-            cubicTo(w, h * 0.75f, w * 0.5f, h, w * 0.5f, h)
-            cubicTo(w * 0.5f, h, 0f, h * 0.75f, 0f, h * 0.25f)
-            close()
-        }
+        // Outer O ring in Navy Blue
+        drawCircle(
+            color = textColor,
+            radius = (s - strokeW) / 2,
+            center = center,
+            style = Stroke(width = strokeW)
+        )
 
-        // Fill white shield interior
-        drawPath(path = path, color = Color.White)
+        // Glowing Chemical Droplet / Bubble inside O
+        val dropletRadius = s * 0.22f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    FromchemAmberGoldLight,
+                    FromchemAmberGold,
+                    Color(0xFFD97706)
+                ),
+                center = center - Offset(dropletRadius * 0.2f, dropletRadius * 0.2f),
+                radius = dropletRadius
+            ),
+            radius = dropletRadius,
+            center = center
+        )
 
-        // Multi-color shield border
-        drawPath(path = path, color = Color(0xFF0251EE), style = Stroke(width = w * 0.15f))
-
-        // Center blue water droplet
-        val dropPath = Path().apply {
-            moveTo(w * 0.5f, h * 0.3f)
-            cubicTo(w * 0.75f, h * 0.65f, w * 0.65f, h * 0.8f, w * 0.5f, h * 0.8f)
-            cubicTo(w * 0.35f, h * 0.8f, w * 0.25f, h * 0.65f, w * 0.5f, h * 0.3f)
-            close()
-        }
-        drawPath(path = dropPath, color = Color(0xFF0251EE))
+        // Droplet top reflection highlight
+        drawCircle(
+            color = Color.White.copy(alpha = 0.8f),
+            radius = dropletRadius * 0.35f,
+            center = center - Offset(dropletRadius * 0.3f, dropletRadius * 0.35f)
+        )
     }
 }
 
 /**
- * Full Brand Logo Composable accurately reproducing the FROMCHEM SOLUTIONS logo.
+ * Official Full Brand Logo for FROMCHEM SOLUTION matching the user-provided identity:
+ * - Laboratory chemistry flask on left with yellow 'F' and blue fluid
+ * - "FROMCHEM" with amber droplet in 'O'
+ * - Burgundy divider shelf bar
+ * - "SOLUTION" in navy blue
  */
 @Composable
 fun FromchemBrandLogo(
@@ -163,92 +238,79 @@ fun FromchemBrandLogo(
     showSubtext: Boolean = true,
     compact: Boolean = false
 ) {
+    val flaskHeight = if (compact) 34.dp else 46.dp
+    val titleFontSize = if (compact) 16.sp else 21.sp
+    val subtitleFontSize = if (compact) 10.sp else 13.sp
+    val shelfHeight = if (compact) 2.5.dp else 3.5.dp
+    val dropletSize = if (compact) 13.dp else 17.dp
+
     Row(
-        modifier = modifier,
+        modifier = modifier.semantics { contentDescription = "Fromchem Solution Brand Logo" },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Molecule 3D Mark
-        MoleculeLogoMark(size = if (compact) 36.dp else 46.dp)
+        // 1. Chemistry Flask Mark
+        FromchemFlaskMark(height = flaskHeight)
 
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(4.dp))
 
-        Column {
-            // Main Brand Title: "FROMCHEM"
-            Text(
-                text = "FROMCHEM",
-                fontSize = if (compact) 16.sp else 21.sp,
-                fontWeight = FontWeight.Black,
-                color = FromchemPrimary,
-                letterSpacing = 0.5.sp
-            )
-
-            // Second Line: Green Line + SOLUTIONS + Yellow Line
+        // 2. Wordmark Stack: FROMCHEM + Burgundy Shelf + SOLUTION
+        Column(
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Main Line: "FROMCHEM" with droplet in 'O'
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.Start
             ) {
-                Box(
-                    modifier = Modifier
-                        .width(if (compact) 10.dp else 16.dp)
-                        .height(2.5.dp)
-                        .background(FromchemAccentGreen, RoundedCornerShape(2.dp))
-                )
-
                 Text(
-                    text = "SOLUTIONS",
-                    fontSize = if (compact) 12.sp else 15.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = FromchemSecondaryRed,
+                    text = "FR",
+                    fontSize = titleFontSize,
+                    fontWeight = FontWeight.Black,
+                    color = FromchemNavy,
                     letterSpacing = 0.5.sp
                 )
 
-                Box(
-                    modifier = Modifier
-                        .width(if (compact) 10.dp else 16.dp)
-                        .height(2.5.dp)
-                        .background(FromchemAccentYellow, RoundedCornerShape(2.dp))
+                DropletLetterO(
+                    size = dropletSize,
+                    textColor = FromchemNavy
+                )
+
+                Text(
+                    text = "MCHEM",
+                    fontSize = titleFontSize,
+                    fontWeight = FontWeight.Black,
+                    color = FromchemNavy,
+                    letterSpacing = 0.5.sp
                 )
             }
 
-            if (showSubtext) {
-                Spacer(modifier = Modifier.height(2.dp))
-
-                // Blue Horizontal Divider Rule
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.95f)
-                        .height(1.5.dp)
-                        .background(FromchemPrimary)
-                )
-
-                Spacer(modifier = Modifier.height(3.dp))
-
-                // Tagline with Shield and Colored Words
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    WaterproofShieldIcon(size = if (compact) 12.dp else 14.dp)
-
-                    Text(
-                        text = buildAnnotatedString {
-                            withStyle(SpanStyle(color = FromchemPrimary, fontWeight = FontWeight.Bold)) {
-                                append("Waterproofing ")
-                            }
-                            withStyle(SpanStyle(color = FromchemAccentGreen, fontWeight = FontWeight.Bold)) {
-                                append("& ")
-                            }
-                            withStyle(SpanStyle(color = FromchemSecondaryRed, fontWeight = FontWeight.Bold)) {
-                                append("Construction ")
-                            }
-                            withStyle(SpanStyle(color = FromchemAccentYellow, fontWeight = FontWeight.Bold)) {
-                                append("Chemicals")
-                            }
-                        },
-                        fontSize = if (compact) 8.sp else 10.sp
+            // Burgundy Red Divider Shelf Bar (connecting from flask to wordmark edge)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(if (compact) 0.92f else 0.96f)
+                    .height(shelfHeight)
+                    .clip(
+                        GenericShape { size, _ ->
+                            moveTo(0f, 0f)
+                            lineTo(size.width - size.height, 0f)
+                            lineTo(size.width, size.height)
+                            lineTo(0f, size.height)
+                            close()
+                        }
                     )
-                }
-            }
+                    .background(FromchemBurgundy)
+            )
+
+            Spacer(modifier = Modifier.height(1.dp))
+
+            // Subtitle Line: "SOLUTION"
+            Text(
+                text = "SOLUTION",
+                fontSize = subtitleFontSize,
+                fontWeight = FontWeight.ExtraBold,
+                color = FromchemNavy,
+                letterSpacing = if (compact) 2.sp else 2.5.sp
+            )
         }
     }
 }

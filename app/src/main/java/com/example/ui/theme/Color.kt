@@ -23,3 +23,10 @@ val FromchemTextMuted = Color(0xFF94A3B8)
 val FromchemAccentRed = Color(0xFFE52521)
 val FromchemBorder = Color(0xFFE2E8F0)
 
+// Official FROMCHEM SOLUTION Logo Identity Colors
+val FromchemNavy = Color(0xFF0C2444) // Official deep navy blue in wordmark & flask
+val FromchemBurgundy = Color(0xFF800B14) // Official burgundy red in flask contour & divider shelf
+val FromchemAmberGold = Color(0xFFF7B500) // Official golden amber in letter 'F' & 'O' droplet
+val FromchemAmberGoldLight = Color(0xFFFFD166) // Droplet highlight
+val FromchemFlaskLiquid = Color(0xFF0D2C4D) // Dark blue liquid fill in chemistry flask
+

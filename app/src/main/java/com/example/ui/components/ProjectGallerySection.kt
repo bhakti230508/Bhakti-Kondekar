@@ -1,51 +1,65 @@
 package com.example.ui.components
 
+import android.content.Context
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Compare
-import androidx.compose.material.icons.filled.Engineering
-import androidx.compose.material.icons.filled.Expand
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
+import com.example.R
 import com.example.ui.theme.*
 import kotlinx.coroutines.launch
 
+/**
+ * Authoritative Project data model for the Project Gallery.
+ * Strictly adheres to the requirement that real, original images (user-uploaded or stored)
+ * are displayed directly, prioritizing:
+ * 1. User-uploaded original image (Uri / URL)
+ * 2. Existing stored project image (Drawable resource)
+ * 3. Clear "Image unavailable" placeholder
+ * NEVER uses AI-generated replacement images.
+ */
 data class GalleryProject(
     val id: String,
     val title: String,
@@ -58,7 +72,17 @@ data class GalleryProject(
     val testResult: String,
     val photoCount: Int,
     val primaryColor: Color,
-    val secondaryColor: Color
+    val secondaryColor: Color,
+    // Stored project drawable resources
+    val beforeRes: Int? = null,
+    val afterRes: Int? = null,
+    val comparisonRes: Int? = null,
+    // Real user-uploaded original images (exact original files/URIs)
+    val userUploadedOriginalUris: List<Uri> = emptyList(),
+    val userUploadedBeforeUri: Uri? = null,
+    val userUploadedAfterUri: Uri? = null,
+    val userUploadedComparisonUri: Uri? = null,
+    val originalImageUrl: String? = null
 )
 
 val sampleGalleryProjects = listOf(
@@ -74,21 +98,27 @@ val sampleGalleryProjects = listOf(
         testResult = "Hydrostatic Water Ponding Test Passed (72 Hours Zero Leak)",
         photoCount = 4,
         primaryColor = Color(0xFF0288D1),
-        secondaryColor = Color(0xFF00ACC1)
+        secondaryColor = Color(0xFF00ACC1),
+        beforeRes = R.drawable.skyline_rooftop_before,
+        afterRes = R.drawable.skyline_rooftop_after,
+        comparisonRes = R.drawable.skyline_rooftop_comparison
     ),
     GalleryProject(
         id = "proj_02",
-        title = "Metro Rail Tunnel & Underground Station",
+        title = "Basement Retaining Wall Crack Injection & Tanking",
         category = "Basement Tanking",
         location = "Surat, Gujarat",
         areaSize = "1,20,000 sq ft",
-        chemicalUsed = "Fromchem Crystalline Deep-Penetrant Slurry",
+        chemicalUsed = "Fromchem Crystalline Deep-Penetrant Slurry & PU Injection Grout",
         durability = "Lifetime Concrete Self-Healing",
-        description = "Deep reactive chemical slurry reacting with moisture to grow insoluble needle-like crystals, permanently blocking capillary pores against high water pressure.",
+        description = "High-pressure chemical polyurethane injection grouting and deep crystalline slurry applied directly to leaking basement retaining wall cracks under hydrostatic groundwater pressure.",
         testResult = "12 Bar Positive & Negative Hydrostatic Pressure Tested",
         photoCount = 5,
         primaryColor = Color(0xFF388E3C),
-        secondaryColor = Color(0xFF66BB6A)
+        secondaryColor = Color(0xFF66BB6A),
+        beforeRes = R.drawable.basement_tanking_before,
+        afterRes = R.drawable.basement_tanking_after,
+        comparisonRes = R.drawable.basement_tanking_comparison
     ),
     GalleryProject(
         id = "proj_03",
@@ -148,20 +178,138 @@ val sampleGalleryProjects = listOf(
     )
 )
 
+/**
+ * Standard Image Unavailable placeholder.
+ * Displayed if original user image or stored image cannot be accessed.
+ * Strictly avoids AI-generated or simulated images.
+ */
+@Composable
+fun ImageUnavailablePlaceholder(
+    modifier: Modifier = Modifier,
+    label: String = "Image unavailable",
+    subtitle: String = "No original project photo provided"
+) {
+    Box(
+        modifier = modifier
+            .background(Color(0xFF263238)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.BrokenImage,
+                contentDescription = label,
+                tint = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.size(36.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.9f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = subtitle,
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.55f),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/**
+ * Direct Image Component implementing the mandatory priority order:
+ * 1. User-uploaded original image (Uri / URL)
+ * 2. Existing stored project image (Drawable resource)
+ * 3. Clear "Image unavailable" placeholder
+ * NEVER uses an AI-generated replacement.
+ */
+@Composable
+fun AuthoritativeProjectImage(
+    userUploadedUri: Uri? = null,
+    userUploadedUrl: String? = null,
+    storedResId: Int? = null,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    val context = LocalContext.current
+
+    // Priority 1: User-uploaded original image (Uri or URL)
+    if (userUploadedUri != null) {
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(userUploadedUri)
+                .crossfade(true)
+                .build(),
+            contentDescription = contentDescription,
+            contentScale = contentScale,
+            modifier = modifier,
+            error = {
+                ImageUnavailablePlaceholder(
+                    modifier = modifier,
+                    label = "Image unavailable",
+                    subtitle = "Uploaded image could not be loaded"
+                )
+            }
+        )
+    } else if (!userUploadedUrl.isNullOrBlank()) {
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(userUploadedUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = contentDescription,
+            contentScale = contentScale,
+            modifier = modifier,
+            error = {
+                ImageUnavailablePlaceholder(
+                    modifier = modifier,
+                    label = "Image unavailable",
+                    subtitle = "Original file unavailable"
+                )
+            }
+        )
+    } else if (storedResId != null) {
+        // Priority 2: Existing stored project image
+        Image(
+            painter = painterResource(id = storedResId),
+            contentDescription = contentDescription,
+            contentScale = contentScale,
+            modifier = modifier
+        )
+    } else {
+        // Priority 3: Clear "Image unavailable" placeholder
+        ImageUnavailablePlaceholder(
+            modifier = modifier,
+            label = "Image unavailable",
+            subtitle = "No original project photo provided"
+        )
+    }
+}
+
 @Composable
 fun ProjectGallerySection(
     onGetQuoteForProject: (String) -> Unit,
     isWideScreen: Boolean,
     modifier: Modifier = Modifier
 ) {
+    var projectsList by remember { mutableStateOf(sampleGalleryProjects) }
     val categories = listOf("All Projects", "Roof Waterproofing", "Basement Tanking", "Bridge & Infrastructure", "Podiums & Plazas")
     var selectedCategory by remember { mutableStateOf("All Projects") }
 
-    val filteredProjects = remember(selectedCategory) {
+    val filteredProjects = remember(selectedCategory, projectsList) {
         if (selectedCategory == "All Projects") {
-            sampleGalleryProjects
+            projectsList
         } else {
-            sampleGalleryProjects.filter { it.category == selectedCategory }
+            projectsList.filter { it.category == selectedCategory }
         }
     }
 
@@ -169,6 +317,8 @@ fun ProjectGallerySection(
     val coroutineScope = rememberCoroutineScope()
 
     var activeLightboxProject by remember { mutableStateOf<GalleryProject?>(null) }
+    var uploadTargetProject by remember { mutableStateOf<GalleryProject?>(null) }
+    var showUploadModal by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -200,7 +350,7 @@ fun ProjectGallerySection(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "REAL WORK & VISUAL QUALITY",
+                        text = "REAL WORK & AUTHORITATIVE IMAGES",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = FromchemPrimary,
@@ -220,12 +370,40 @@ fun ProjectGallerySection(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "Swipe through our completed chemical waterproofing applications across industrial, commercial, and infrastructure sites.",
+                text = "Verified original photos directly from real construction sites. Never AI-generated or replaced.",
                 fontSize = 13.sp,
                 color = FromchemTextSecondary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Direct User Photo Upload Action Button
+            Button(
+                onClick = {
+                    uploadTargetProject = filteredProjects.firstOrNull() ?: sampleGalleryProjects[1]
+                    showUploadModal = true
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
+                shape = RoundedCornerShape(20.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.testTag("upload_real_project_photo_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AddPhotoAlternate,
+                    contentDescription = "Upload Real Photo",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Upload Original Project Photos",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -277,7 +455,7 @@ fun ProjectGallerySection(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isWideScreen) 480.dp else 450.dp)
+                    .height(if (isWideScreen) 510.dp else 470.dp)
             ) {
                 HorizontalPager(
                     state = pagerState,
@@ -290,6 +468,10 @@ fun ProjectGallerySection(
                         GalleryProjectCard(
                             project = project,
                             onInspectClick = { activeLightboxProject = project },
+                            onUploadPhotosClick = {
+                                uploadTargetProject = project
+                                showUploadModal = true
+                            },
                             onGetQuoteClick = { onGetQuoteForProject(project.title) },
                             isWideScreen = isWideScreen
                         )
@@ -347,7 +529,7 @@ fun ProjectGallerySection(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Page Indicator Dots & Swipe Hint
+            // Page Indicator Dots & Info
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -403,17 +585,46 @@ fun ProjectGallerySection(
             }
         )
     }
+
+    // Direct User Upload Dialog
+    if (showUploadModal && uploadTargetProject != null) {
+        UploadProjectPhotosDialog(
+            project = uploadTargetProject!!,
+            onDismiss = {
+                showUploadModal = false
+                uploadTargetProject = null
+            },
+            onPhotosUploaded = { updatedProject ->
+                // Update project list in memory with the authoritative uploaded image references
+                projectsList = projectsList.map {
+                    if (it.id == updatedProject.id) updatedProject else it
+                }
+                showUploadModal = false
+                uploadTargetProject = null
+            }
+        )
+    }
 }
 
+/**
+ * Gallery Project Card displaying the authoritative project image.
+ * Provides interactive Before / After / Compare toggles, directly rendering the real uploaded or stored image.
+ */
 @Composable
 fun GalleryProjectCard(
     project: GalleryProject,
     onInspectClick: () -> Unit,
+    onUploadPhotosClick: () -> Unit,
     onGetQuoteClick: () -> Unit,
     isWideScreen: Boolean,
     modifier: Modifier = Modifier
 ) {
-    var showAfterView by remember { mutableStateOf(true) }
+    // Initial tab logic
+    val hasComparison = project.userUploadedComparisonUri != null || project.comparisonRes != null
+    val hasBefore = project.userUploadedBeforeUri != null || project.beforeRes != null
+    var selectedTab by remember(project.id) {
+        mutableStateOf(if (hasComparison) "compare" else if (hasBefore) "before" else "after")
+    }
 
     Card(
         modifier = modifier
@@ -424,11 +635,11 @@ fun GalleryProjectCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Visual Banner Graphic with Canvas
+            // Visual Banner Graphic with Direct Authoritative Image Rendering
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isWideScreen) 210.dp else 180.dp)
+                    .height(if (isWideScreen) 260.dp else 230.dp)
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
@@ -438,24 +649,49 @@ fun GalleryProjectCard(
                         )
                     )
             ) {
-                // Chemical Application Canvas Representation
-                ProjectChemicalCanvasGraphic(
-                    project = project,
-                    isAfter = showAfterView,
-                    modifier = Modifier.fillMaxSize()
-                )
+                // Direct rendering based on selected toggle (strictly no AI image generation)
+                when (selectedTab) {
+                    "before" -> {
+                        AuthoritativeProjectImage(
+                            userUploadedUri = project.userUploadedBeforeUri,
+                            storedResId = project.beforeRes,
+                            contentDescription = "Before: ${project.title}",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    "compare" -> {
+                        AuthoritativeProjectImage(
+                            userUploadedUri = project.userUploadedComparisonUri,
+                            storedResId = project.comparisonRes ?: project.afterRes ?: project.beforeRes,
+                            contentDescription = "Before and After: ${project.title}",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    else -> {
+                        AuthoritativeProjectImage(
+                            userUploadedUri = project.userUploadedAfterUri ?: project.userUploadedOriginalUris.firstOrNull(),
+                            userUploadedUrl = project.originalImageUrl,
+                            storedResId = project.afterRes ?: project.beforeRes,
+                            contentDescription = "After: ${project.title}",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
 
-                // Category & Badge Overlay
+                // Category & Durability Overlay
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
+                        .padding(10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = Color.Black.copy(alpha = 0.65f)
+                        color = Color.Black.copy(alpha = 0.7f)
                     ) {
                         Text(
                             text = project.category,
@@ -466,186 +702,279 @@ fun GalleryProjectCard(
                         )
                     }
 
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Verified,
+                                    contentDescription = "Durability",
+                                    tint = FromchemAccentGreen,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = project.durability,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = FromchemTextPrimary
+                                )
+                            }
+                        }
+
+                        // Upload User Image Button
+                        IconButton(
+                            onClick = onUploadPhotosClick,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.9f))
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Verified,
-                                contentDescription = "Durability",
-                                tint = FromchemAccentGreen,
-                                modifier = Modifier.size(12.dp)
+                                imageVector = Icons.Default.FileUpload,
+                                contentDescription = "Upload original project photos",
+                                tint = FromchemPrimary,
+                                modifier = Modifier.size(16.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = project.durability,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = FromchemTextPrimary
+                        }
+
+                        // Fullscreen Zoom Icon Button
+                        IconButton(
+                            onClick = onInspectClick,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.9f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Expand,
+                                contentDescription = "Fullscreen Photo Gallery",
+                                tint = FromchemPrimary,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
                 }
 
-                // Interactive Before / After Toggle Switch Button
-                Surface(
-                    onClick = { showAfterView = !showAfterView },
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(12.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.Black.copy(alpha = 0.75f)
-                ) {
+                // Interactive Before / After Toggle Buttons
+                val canShowBefore = project.userUploadedBeforeUri != null || project.beforeRes != null
+                val canShowAfter = project.userUploadedAfterUri != null || project.afterRes != null || project.userUploadedOriginalUris.isNotEmpty()
+                val canShowCompare = project.userUploadedComparisonUri != null || project.comparisonRes != null
+
+                if (canShowBefore || canShowCompare) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 10.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Color.Black.copy(alpha = 0.75f))
+                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
+                            .padding(horizontal = 4.dp, vertical = 3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Compare,
-                            contentDescription = "Compare View",
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (showAfterView) "Viewing: Chemical Sealed (After)" else "Viewing: Untreated Surface (Before)",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
+                        if (canShowBefore) {
+                            Surface(
+                                onClick = { selectedTab = "before" },
+                                shape = RoundedCornerShape(18.dp),
+                                color = if (selectedTab == "before") Color.White else Color.Transparent
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Before",
+                                        color = if (selectedTab == "before") Color.Black else Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (selectedTab == "before") FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
 
-                // Fullscreen Zoom Icon Button
-                IconButton(
-                    onClick = onInspectClick,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(12.dp)
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.9f))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Expand,
-                        contentDescription = "Fullscreen Photo Gallery",
-                        tint = FromchemPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                        if (canShowAfter) {
+                            Surface(
+                                onClick = { selectedTab = "after" },
+                                shape = RoundedCornerShape(18.dp),
+                                color = if (selectedTab == "after") FromchemPrimary else Color.Transparent
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "After",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (selectedTab == "after") FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+
+                        if (canShowCompare) {
+                            Surface(
+                                onClick = { selectedTab = "compare" },
+                                shape = RoundedCornerShape(18.dp),
+                                color = if (selectedTab == "compare") Color(0xFF0D47A1) else Color.Transparent
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Compare",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (selectedTab == "compare") FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
             // Project Details Section
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+                    .fillMaxWidth()
+                    .padding(16.dp)
             ) {
-                Column {
-                    Text(
-                        text = project.title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = FromchemTextPrimary
+                Text(
+                    text = project.title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FromchemTextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Location",
+                        tint = FromchemPrimary,
+                        modifier = Modifier.size(14.dp)
                     )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = "Location",
-                            tint = FromchemPrimary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = project.location,
-                            fontSize = 12.sp,
-                            color = FromchemTextSecondary
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Icon(
-                            imageVector = Icons.Default.Engineering,
-                            contentDescription = "Area",
-                            tint = FromchemAccentGreen,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = project.areaSize,
-                            fontSize = 12.sp,
-                            color = FromchemTextSecondary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = project.description,
+                        text = project.location,
                         fontSize = 12.sp,
-                        color = FromchemTextPrimary,
-                        maxLines = 2
+                        color = FromchemTextSecondary
                     )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Icon(
+                        imageVector = Icons.Default.SquareFoot,
+                        contentDescription = "Area Size",
+                        tint = FromchemTextSecondary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = project.areaSize,
+                        fontSize = 12.sp,
+                        color = FromchemTextSecondary
+                    )
+                }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                    // Chemical Spec Tag
-                    Surface(
-                        color = FromchemPrimaryContainer,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                // Chemical Specification Badge
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = FromchemSurfaceVariant,
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.WaterDrop,
-                                contentDescription = "Chemical",
-                                tint = FromchemPrimary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = project.chemicalUsed,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = FromchemPrimary
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Science,
+                            contentDescription = "Chemical Spec",
+                            tint = FromchemPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = project.chemicalUsed,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = FromchemTextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
 
-                // Action Buttons Row
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = project.description,
+                    fontSize = 12.sp,
+                    color = FromchemTextSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Action Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(
+                    TextButton(
                         onClick = onInspectClick,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = FromchemPrimary),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(brush = Brush.horizontalGradient(listOf(FromchemBorder, FromchemBorder)))
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                     ) {
-                        Text(text = "View Gallery (${project.photoCount})", fontSize = 11.sp)
+                        Icon(
+                            imageVector = Icons.Default.Collections,
+                            contentDescription = "View Photos",
+                            tint = FromchemPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        val totalCount = if (project.userUploadedOriginalUris.isNotEmpty()) {
+                            project.userUploadedOriginalUris.size
+                        } else {
+                            project.photoCount
+                        }
+                        Text(
+                            text = "View $totalCount Photos",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = FromchemPrimary
+                        )
                     }
 
                     Button(
                         onClick = onGetQuoteClick,
-                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                     ) {
-                        Text(text = "Similar Quote", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Get Similar Quote",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -653,151 +982,65 @@ fun GalleryProjectCard(
     }
 }
 
-@Composable
-fun ProjectChemicalCanvasGraphic(
-    project: GalleryProject,
-    isAfter: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-
-        if (!isAfter) {
-            // UNTREATED / BEFORE STATE: Concrete slab texture with water crack lines
-            drawRect(color = Color(0xFF616161))
-
-            // Concrete aggregate specks
-            for (i in 0..40) {
-                val cx = (i * 37) % width
-                val cy = (i * 29) % height
-                drawCircle(
-                    color = Color(0xFF424242),
-                    radius = 3f,
-                    center = Offset(cx, cy)
-                )
-            }
-
-            // Water leakage crack path
-            val crackPath = Path().apply {
-                moveTo(width * 0.2f, 0f)
-                lineTo(width * 0.25f, height * 0.3f)
-                lineTo(width * 0.22f, height * 0.6f)
-                lineTo(width * 0.35f, height)
-            }
-
-            drawPath(
-                path = crackPath,
-                color = Color(0xFF212121),
-                style = Stroke(width = 4f)
-            )
-
-            // Leakage water drop pooling
-            drawCircle(
-                color = Color(0xFF0288D1).copy(alpha = 0.6f),
-                radius = 20f,
-                center = Offset(width * 0.25f, height * 0.45f)
-            )
-        } else {
-            // AFTER STATE: Glossy seamless chemical coating with crystalline reaction nodes
-            val gradient = Brush.linearGradient(
-                colors = listOf(project.primaryColor, project.secondaryColor),
-                start = Offset.Zero,
-                end = Offset(width, height)
-            )
-            drawRect(brush = gradient)
-
-            // Monolithic chemical wave sheen lines
-            val wavePath = Path().apply {
-                moveTo(0f, height * 0.4f)
-                cubicTo(
-                    width * 0.3f, height * 0.2f,
-                    width * 0.7f, height * 0.6f,
-                    width, height * 0.35f
-                )
-                lineTo(width, height)
-                lineTo(0f, height)
-                close()
-            }
-            drawPath(
-                path = wavePath,
-                color = Color.White.copy(alpha = 0.15f)
-            )
-
-            // Chemical molecular sealing nodes
-            for (i in 0..15) {
-                val nx = (i * 67 + 30) % width
-                val ny = (i * 43 + 20) % height
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.35f),
-                    radius = 8f,
-                    center = Offset(nx, ny)
-                )
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.7f),
-                    radius = 3f,
-                    center = Offset(nx, ny)
-                )
-            }
-
-            // Glossy highlight reflection bar
-            drawRect(
-                color = Color.White.copy(alpha = 0.18f),
-                topLeft = Offset(width * 0.6f, 0f),
-                size = Size(width * 0.15f, height)
-            )
-        }
-    }
-}
-
+/**
+ * Fullscreen Lightbox Modal displaying original project photos in full resolution.
+ * Displays user-uploaded images or stored project images directly.
+ * Displays clear "Image unavailable" if no image exists. Never generates AI imagery.
+ */
 @Composable
 fun ProjectLightboxDialog(
     project: GalleryProject,
     onDismiss: () -> Unit,
     onGetQuoteClick: () -> Unit
 ) {
+    var lightboxTab by remember { mutableStateOf("after") }
     var activePhotoIndex by remember { mutableIntStateOf(0) }
 
-    val photoTitles = listOf(
-        "1. Surface Preparation & Sanding",
-        "2. Spray Application of Chemical Sealant",
-        "3. Monolithic Cured Membrane Finish",
-        "4. Hydrostatic Ponding Test Inspection",
-        "5. Final Client Handover & ISO Certificate"
-    ).take(project.photoCount)
+    // Aggregate all original images in strict upload order
+    val allOriginalUris = remember(project) {
+        val list = mutableListOf<Uri>()
+        project.userUploadedBeforeUri?.let { list.add(it) }
+        project.userUploadedAfterUri?.let { list.add(it) }
+        project.userUploadedComparisonUri?.let { list.add(it) }
+        list.addAll(project.userUploadedOriginalUris)
+        list.distinct()
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
+        Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.9f))
-                .padding(16.dp)
+                .background(Color.Black),
+            color = Color.Black
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .align(Alignment.Center),
-                verticalArrangement = Arrangement.SpaceBetween
+                    .padding(16.dp)
             ) {
-                // Top Lightbox Bar
+                // Modal Top Bar
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = project.title,
                             color = Color.White,
                             fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "${project.location} • Photo ${activePhotoIndex + 1} of ${project.photoCount}",
-                            color = Color.Gray,
+                            text = "${project.location} • ${project.areaSize} • Real Site Photography",
+                            color = Color.White.copy(alpha = 0.7f),
                             fontSize = 12.sp
                         )
                     }
@@ -805,6 +1048,7 @@ fun ProjectLightboxDialog(
                     IconButton(
                         onClick = onDismiss,
                         modifier = Modifier
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.2f))
                     ) {
@@ -816,136 +1060,520 @@ fun ProjectLightboxDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // Interactive Switcher (Before / After / Compare)
+                val canCompare = project.userUploadedComparisonUri != null || project.comparisonRes != null
+                val canBefore = project.userUploadedBeforeUri != null || project.beforeRes != null
 
-                // High-Res Canvas Image Frame
+                if (canCompare || canBefore) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (canBefore) {
+                            Surface(
+                                onClick = { lightboxTab = "before" },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (lightboxTab == "before") Color.White else Color.White.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "Before",
+                                    color = if (lightboxTab == "before") Color.Black else Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+
+                        Surface(
+                            onClick = { lightboxTab = "after" },
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (lightboxTab == "after") FromchemPrimary else Color.White.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "After",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                            )
+                        }
+
+                        if (canCompare) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                onClick = { lightboxTab = "compare" },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (lightboxTab == "compare") Color(0xFF0D47A1) else Color.White.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "Compare",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Direct Fullscreen Image Rendering Frame
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
                         .background(Color(0xFF1E1E1E))
                 ) {
-                    ProjectChemicalCanvasGraphic(
-                        project = project,
-                        isAfter = activePhotoIndex % 2 == 0,
-                        modifier = Modifier.fillMaxSize()
-                    )
-
-                    // Photo Step Title Ribbon
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(16.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.Black.copy(alpha = 0.8f)
-                    ) {
-                        Text(
-                            text = photoTitles.getOrElse(activePhotoIndex) { "Inspection Photo" },
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    if (allOriginalUris.isNotEmpty()) {
+                        // User uploaded original photos displayed in exact order
+                        val currentUri = allOriginalUris.getOrNull(activePhotoIndex) ?: allOriginalUris.first()
+                        AuthoritativeProjectImage(
+                            userUploadedUri = currentUri,
+                            contentDescription = "${project.title} - Photo ${activePhotoIndex + 1}",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
                         )
-                    }
-
-                    // Left Photo Prev Arrow
-                    if (activePhotoIndex > 0) {
-                        IconButton(
-                            onClick = { activePhotoIndex-- },
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .padding(8.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.6f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Previous Photo",
-                                tint = Color.White
-                            )
+                    } else {
+                        // Stored project photos with Before / After / Compare support
+                        when (lightboxTab) {
+                            "before" -> {
+                                AuthoritativeProjectImage(
+                                    storedResId = project.beforeRes,
+                                    contentDescription = "Before Treatment",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            "compare" -> {
+                                AuthoritativeProjectImage(
+                                    storedResId = project.comparisonRes ?: project.afterRes ?: project.beforeRes,
+                                    contentDescription = "Side-by-side comparison",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            else -> {
+                                AuthoritativeProjectImage(
+                                    userUploadedUrl = project.originalImageUrl,
+                                    storedResId = project.afterRes ?: project.beforeRes,
+                                    contentDescription = "After Treatment",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
 
-                    // Right Photo Next Arrow
-                    if (activePhotoIndex < project.photoCount - 1) {
-                        IconButton(
-                            onClick = { activePhotoIndex++ },
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(8.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.6f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "Next Photo",
-                                tint = Color.White
-                            )
+                    // Navigation Arrows for multi-photo uploaded gallery
+                    if (allOriginalUris.size > 1) {
+                        if (activePhotoIndex > 0) {
+                            IconButton(
+                                onClick = { activePhotoIndex-- },
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .padding(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.6f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Previous Photo",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+
+                        if (activePhotoIndex < allOriginalUris.size - 1) {
+                            IconButton(
+                                onClick = { activePhotoIndex++ },
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.6f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "Next Photo",
+                                    tint = Color.White
+                                )
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Bottom Specs & Test Info
+                // Bottom Metadata Card
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF262626)
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF1E1E1E),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = "Passed Test",
-                                tint = FromchemAccentGreen,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = project.testResult,
-                                color = FromchemAccentGreen,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = project.description,
-                            color = Color.LightGray,
-                            fontSize = 12.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
+                    Column(modifier = Modifier.padding(14.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Chemical: ${project.chemicalUsed}",
-                                color = FromchemPrimaryContainer,
+                                text = "TEST & COMPLIANCE RESULT",
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Bold,
+                                color = FromchemAccentGreen
                             )
-
-                            Button(
-                                onClick = onGetQuoteClick,
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color.White.copy(alpha = 0.1f)
                             ) {
-                                Text("Get Quote for This Solution", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = project.durability,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = project.testResult,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = project.description,
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.75f),
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = onGetQuoteClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary)
+                ) {
+                    Text(
+                        text = "Request Technical Consultation & Quote",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Upload Real Project Photos Dialog.
+ * Allows users to upload original site photos using Android's Photo Picker.
+ * Preserves exact file references, order, and appearance without AI regeneration.
+ */
+@Composable
+fun UploadProjectPhotosDialog(
+    project: GalleryProject,
+    onDismiss: () -> Unit,
+    onPhotosUploaded: (GalleryProject) -> Unit
+) {
+    val context = LocalContext.current
+    var uploadedBeforeUri by remember { mutableStateOf<Uri?>(project.userUploadedBeforeUri) }
+    var uploadedAfterUri by remember { mutableStateOf<Uri?>(project.userUploadedAfterUri) }
+    var uploadedList by remember { mutableStateOf<List<Uri>>(project.userUploadedOriginalUris) }
+
+    // Android Photo Pickers for Before and After
+    val beforePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            uploadedBeforeUri = uri
+            Toast.makeText(context, "Original Before photo loaded", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val afterPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            uploadedAfterUri = uri
+            Toast.makeText(context, "Original After photo loaded", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val multiplePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            uploadedList = uris
+            Toast.makeText(context, "${uris.size} original photos loaded", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.85f)
+                .clip(RoundedCornerShape(24.dp)),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Upload Original Project Photos",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = FromchemTextPrimary
+                        )
+                        Text(
+                            text = "For ${project.title}",
+                            fontSize = 12.sp,
+                            color = FromchemTextSecondary
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Strict Real Photo Notice
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFE8F5E9),
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Real Images",
+                            tint = FromchemAccentGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Uploaded photos are stored as authoritative originals. No AI image generation or modification will be applied.",
+                            fontSize = 11.sp,
+                            color = Color(0xFF1B5E20),
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Before Photo Picker Section
+                Text(
+                    text = "1. Before Photo (Raw Substrate / Leak)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FromchemTextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(FromchemSurfaceVariant)
+                        .border(1.dp, FromchemBorder, RoundedCornerShape(12.dp))
+                        .clickable {
+                            beforePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (uploadedBeforeUri != null) {
+                        AsyncImage(
+                            model = uploadedBeforeUri,
+                            contentDescription = "Uploaded Before Photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.AddPhotoAlternate,
+                                contentDescription = "Pick Before",
+                                tint = FromchemPrimary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Select Before Photo",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = FromchemPrimary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // After Photo Picker Section
+                Text(
+                    text = "2. After Photo (Completed Waterproofing)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FromchemTextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(FromchemSurfaceVariant)
+                        .border(1.dp, FromchemBorder, RoundedCornerShape(12.dp))
+                        .clickable {
+                            afterPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (uploadedAfterUri != null) {
+                        AsyncImage(
+                            model = uploadedAfterUri,
+                            contentDescription = "Uploaded After Photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.AddPhotoAlternate,
+                                contentDescription = "Pick After",
+                                tint = FromchemPrimary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Select After Photo",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = FromchemPrimary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Multiple Photos Picker Section
+                Text(
+                    text = "3. Or Select Multiple Project Photos (In Exact Order)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FromchemTextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = {
+                        multiplePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Collections,
+                        contentDescription = "Select multiple photos",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Choose up to 10 Original Photos")
+                }
+
+                if (uploadedList.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(uploadedList) { uri ->
+                            Box(
+                                modifier = Modifier
+                                    .size(70.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, FromchemBorder, RoundedCornerShape(8.dp))
+                            ) {
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = "Uploaded photo preview",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
                         }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Confirm Save Button
+                Button(
+                    onClick = {
+                        val updated = project.copy(
+                            userUploadedBeforeUri = uploadedBeforeUri,
+                            userUploadedAfterUri = uploadedAfterUri,
+                            userUploadedOriginalUris = if (uploadedList.isNotEmpty()) uploadedList else project.userUploadedOriginalUris,
+                            photoCount = maxOf(
+                                project.photoCount,
+                                (if (uploadedBeforeUri != null) 1 else 0) +
+                                        (if (uploadedAfterUri != null) 1 else 0) +
+                                        uploadedList.size
+                            )
+                        )
+                        onPhotosUploaded(updated)
+                        Toast.makeText(context, "Real project photos updated in gallery", Toast.LENGTH_SHORT).show()
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Save Photos",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Save & Display in Project Gallery",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }

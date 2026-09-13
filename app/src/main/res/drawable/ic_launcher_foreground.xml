@@ -4,16 +4,42 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:translateX="18"
-        android:translateY="18">
-        <!-- Shield Background -->
+    <group>
+        <!-- Blue Liquid Fill inside Flask -->
         <path
-            android:fillColor="#4F46E5"
-            android:pathData="M36,6 L12,16 V36 C12,52 22,64 36,70 C50,64 60,52 60,36 V16 L36,6 Z" />
-        <!-- Chemical Beaker / Water Droplet cutout inside -->
+            android:fillColor="#0D2C4D"
+            android:pathData="M39,58 L69,58 L77,74 C78,76 76,79 73,79 L35,79 C32,79 30,76 31,74 Z" />
+
+        <!-- Amber Gold Letter 'F' inside chemical liquid -->
         <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M36,22 C36,22 26,36 26,43 C26,48.5 30.5,53 36,53 C41.5,53 46,48.5 46,43 C46,36 36,22 36,22 Z M36,49 C32.7,49 30,46.3 30,43 C30,39.5 34,31 36,27.5 C38,31 42,39.5 42,43 C42,46.3 39.3,49 36,49 Z" />
+            android:fillColor="#F7B500"
+            android:pathData="M48,63 H59 V66 H51 V68.5 H57 V71.5 H51 V76 H48 Z" />
+
+        <!-- Burgundy Red Outer Flask Contour -->
+        <path
+            android:strokeColor="#800B14"
+            android:strokeWidth="3.2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000"
+            android:pathData="M50,30 L50,44 L30,75 C29,77 30.5,79.5 33,79.5 L75,79.5 C77.5,79.5 79,77 78,75 L58,44 L58,30" />
+
+        <!-- Burgundy Red Flask Lip -->
+        <path
+            android:fillColor="#800B14"
+            android:pathData="M46,27 C46,25.5 47.5,24.5 49,24.5 L59,24.5 C60.5,24.5 62,25.5 62,27 C62,28.5 60.5,29.5 59,29.5 L49,29.5 C47.5,29.5 46,28.5 46,27 Z" />
+
+        <!-- Navy Blue Inner Lip Accent -->
+        <path
+            android:fillColor="#0C2444"
+            android:pathData="M49,26 L59,26 C59.5,26 60,26.5 60,27 C60,27.5 59.5,28 59,28 L49,28 C48.5,28 48,27.5 48,27 C48,26.5 48.5,26 49,26 Z" />
+
+        <!-- Glass Sheen Highlight on Left -->
+        <path
+            android:strokeColor="#80FFFFFF"
+            android:strokeWidth="1.6"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M34,73 L51,46" />
     </group>
 </vector>

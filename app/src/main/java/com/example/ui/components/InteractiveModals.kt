@@ -224,7 +224,7 @@ fun LiveChatDialog(
             listOf(
                 ChatMessageItem(
                     sender = "ai",
-                    text = "Hello! Welcome to Fromchem Technical Support. I am your AI Waterproofing Engineer. You can chat with me using text or voice. How can I assist you with your project today?"
+                    text = "Hello! Welcome to Fromchem Technical Support. I am your AI Waterproofing Assistant. Ask me for recommendations on wall crack, ceilling leackage, damp wall, or basement wall. You can chat using text or voice. How can I assist you today?"
                 )
             )
         )
@@ -339,17 +339,19 @@ fun LiveChatDialog(
     }
 
     val suggestedQuestions = listOf(
+        "Recommendation for wall crack",
+        "Recommendation for ceilling leackage",
+        "Recommendation for damp wall",
+        "Recommendation for basement wall",
         "What is Crystalline Waterproofing?",
-        "How fast does Polyurea cure?",
-        "Best waterproofing for basements?",
-        "How does the 15-year warranty work?"
+        "How fast does Polyurea cure?"
     )
 
     val sampleVoiceQueries = listOf(
-        "How to treat damp wall cracks?",
-        "Best chemical coat for roof terrace?",
-        "Basement water leakage solution",
-        "Explain crystalline self-healing technology"
+        "Recommendation for wall crack",
+        "Recommendation for ceilling leackage",
+        "Recommendation for damp wall",
+        "Recommendation for basement wall"
     )
 
     AlertDialog(

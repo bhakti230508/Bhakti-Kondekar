@@ -26,7 +26,6 @@ import com.example.ui.theme.*
 import androidx.compose.material.icons.filled.AutoAwesome
 
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Person
 
 @Composable
@@ -38,7 +37,6 @@ fun HeaderNavBar(
     onToggleDesktopMode: () -> Unit,
     currentUser: UserProfile? = null,
     onAccountClicked: () -> Unit,
-    onAiCameraClicked: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -98,25 +96,6 @@ fun HeaderNavBar(
 
             // Right Action Buttons
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // AI Leak Camera Scanner Button
-                IconButton(
-                    onClick = onAiCameraClicked,
-                    modifier = Modifier
-                        .testTag("ai_camera_header_button")
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(FromchemPrimaryContainer)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "AI Leak Detector Camera",
-                        tint = FromchemPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
                 // Desktop / Mobile Mode Switcher
                 IconButton(
                     onClick = onToggleDesktopMode,

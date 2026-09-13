@@ -125,9 +125,6 @@ fun FromchemApp() {
                         } else {
                             showProfileModal = true
                         }
-                    },
-                    onAiCameraClicked = {
-                        showAiCameraModal = true
                     }
                 )
 
@@ -145,10 +142,6 @@ fun FromchemApp() {
                         HeroSection(
                             onExploreSolutionsClicked = {
                                 showQuoteModal = true
-                            },
-                            onViewCaseStudiesClicked = {
-                                selectedTab = "Projects"
-                                Toast.makeText(context, "Opening Waterproofing Case Studies", Toast.LENGTH_SHORT).show()
                             },
                             onAiCameraScanClicked = {
                                 showAiCameraModal = true

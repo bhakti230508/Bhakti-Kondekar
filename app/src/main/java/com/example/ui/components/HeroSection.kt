@@ -31,7 +31,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 @Composable
 fun HeroSection(
     onExploreSolutionsClicked: () -> Unit,
-    onViewCaseStudiesClicked: () -> Unit,
+    onViewCaseStudiesClicked: () -> Unit = {},
     onAiCameraScanClicked: () -> Unit = {},
     isWideScreen: Boolean,
     modifier: Modifier = Modifier
@@ -51,7 +51,6 @@ fun HeroSection(
                 Column(modifier = Modifier.weight(1f)) {
                     HeroTextContent(
                         onExploreSolutionsClicked = onExploreSolutionsClicked,
-                        onViewCaseStudiesClicked = onViewCaseStudiesClicked,
                         onAiCameraScanClicked = onAiCameraScanClicked
                     )
                 }
@@ -67,7 +66,6 @@ fun HeroSection(
             ) {
                 HeroTextContent(
                     onExploreSolutionsClicked = onExploreSolutionsClicked,
-                    onViewCaseStudiesClicked = onViewCaseStudiesClicked,
                     onAiCameraScanClicked = onAiCameraScanClicked
                 )
                 HeroWorkerGraphic()
@@ -79,7 +77,6 @@ fun HeroSection(
 @Composable
 private fun HeroTextContent(
     onExploreSolutionsClicked: () -> Unit,
-    onViewCaseStudiesClicked: () -> Unit,
     onAiCameraScanClicked: () -> Unit
 ) {
     Column(
@@ -207,7 +204,7 @@ private fun HeroTextContent(
                             }
                         }
                         Text(
-                            text = "Snap wall cracks, ceiling leaks, dampness, terrace or basement",
+                            text = "Auto-detects wall cracks, moisture, ceiling leaks, or dampness",
                             fontSize = 11.sp,
                             color = FromchemTextSecondary
                         )
@@ -241,7 +238,7 @@ private fun HeroTextContent(
                     contentColor = Color.White
                 ),
                 shape = RoundedCornerShape(24.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp)
+                contentPadding = PaddingValues(horizontal = 24.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -249,7 +246,7 @@ private fun HeroTextContent(
                 ) {
                     Text(
                         text = "Explore Solutions",
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Icon(
@@ -258,26 +255,6 @@ private fun HeroTextContent(
                         modifier = Modifier.size(16.dp)
                     )
                 }
-            }
-
-            // Secondary View Case Studies Button
-            OutlinedButton(
-                onClick = onViewCaseStudiesClicked,
-                modifier = Modifier
-                    .testTag("view_case_studies_button")
-                    .height(46.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = FromchemTextPrimary
-                ),
-                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
-                shape = RoundedCornerShape(24.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp)
-            ) {
-                Text(
-                    text = "View Case Studies",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
             }
         }
     }

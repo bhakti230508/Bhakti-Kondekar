@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="60dp"
+    android:viewportWidth="200"
+    android:viewportHeight="60">
+
+    <!-- Chemistry Flask Graphic (Left) -->
+    <!-- Blue Liquid Fill -->
+    <path
+        android:fillColor="#0D2C4D"
+        android:pathData="M16,33 L32,33 L38,47 C39,49 37.5,51 35.5,51 L12.5,51 C10.5,51 9,49 10,47 Z" />
+
+    <!-- Amber Gold Letter 'F' -->
+    <path
+        android:fillColor="#F7B500"
+        android:pathData="M21,37 H28 V39 H23 V41 H27 V43 H23 V48 H21 Z" />
+
+    <!-- Burgundy Red Outer Flask Contour -->
+    <path
+        android:strokeColor="#800B14"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M21,14 L21,24 L9,47 C8,49 9,51.5 11.5,51.5 L36.5,51.5 C39,51.5 40,49 39,47 L27,24 L27,14" />
+
+    <!-- Burgundy Lip -->
+    <path
+        android:fillColor="#800B14"
+        android:pathData="M19,12 C19,10.8 20,10 21.5,10 L26.5,10 C28,10 29,10.8 29,12 C29,13.2 28,14 26.5,14 L21.5,14 C20,14 19,13.2 19,12 Z" />
+
+    <!-- Burgundy Divider Shelf Bar -->
+    <path
+        android:fillColor="#800B14"
+        android:pathData="M44,34 L188,34 L192,37.5 L44,37.5 Z" />
+
+</vector>
