@@ -49,6 +49,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.ai.GeminiChatService
 import com.example.ai.GeminiLeakAnalysisResult
+import com.example.ai.DetectedDefect
+import com.example.ai.DefectBoundingBox
 import com.example.data.FirebasePhotoManager
 import com.example.ui.theme.*
 import kotlinx.coroutines.Job
@@ -66,7 +68,8 @@ data class StructuralPreset(
     val severityColor: Color,
     val chemicalSpec: String,
     val description: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val defects: List<DetectedDefect> = emptyList()
 )
 
 val sampleStructuralPresets = listOf(
@@ -74,14 +77,44 @@ val sampleStructuralPresets = listOf(
         id = "preset_wall_crack",
         name = "Wall Crack",
         category = "Masonry Crack",
-        detectedIssue = "Vertical Shear & Settlement Wall Crack",
-        recommendedApplication = "Crack Paste (Fromchem Polymeric Crack Filler)",
+        detectedIssue = "Vertical Settlement Wall Crack",
+        recommendedApplication = "Crack Paste (Fromchem Polymeric Waterproofing Crack Paste)",
         suggestedNextStep = "V-Groove Opening & Deep Application of Crack Paste",
         severityLevel = "Moderate Risk",
         severityColor = Color(0xFFF57C00),
         chemicalSpec = "Polymeric Waterproofing Crack Paste with High Elasticity",
         description = "Masonry and plaster cracks permitting moisture migration. High-grade Crack Paste fills structural voids, prevents micro-capillary seepage, and flexes with thermal expansion.",
-        icon = Icons.Default.BrokenImage
+        icon = Icons.Default.BrokenImage,
+        defects = listOf(
+            DetectedDefect(
+                id = "preset_defect_1",
+                problemTitle = "Vertical Settlement Wall Crack",
+                shortLabel = "Wall Crack",
+                location = "Central vertical wall section",
+                severity = "MODERATE",
+                confidenceScore = 95,
+                visualEvidence = "Distinct linear fracture splitting wall plaster and substrate vertically.",
+                likelyCause = "Substrate settlement or thermal expansion and contraction (recommend monitoring for growth).",
+                recommendedAction = "Chisel V-groove profile (approx 5mm x 5mm), blow out debris, and inject high-elasticity polymeric filler.",
+                fromchemSolution = "Crack Paste (Fromchem Polymeric Waterproofing Crack Paste)",
+                fromchemProductSpec = "Polymeric Waterproofing Crack Paste with High Elasticity",
+                boundingBox = DefectBoundingBox(0.08f, 0.38f, 0.92f, 0.62f)
+            ),
+            DetectedDefect(
+                id = "preset_defect_2",
+                problemTitle = "Branching Hairline Plaster Fissures",
+                shortLabel = "Hairline Crack",
+                location = "Right-hand adjacent masonry surface",
+                severity = "LOW",
+                confidenceScore = 88,
+                visualEvidence = "Fine branching micro-fissures radiating from primary settlement crack.",
+                likelyCause = "Plaster drying shrinkage and secondary stress relief.",
+                recommendedAction = "Clean surface and skim with flexible crack filler prior to repainting.",
+                fromchemSolution = "Crack Paste (Fromchem Polymeric Waterproofing Crack Paste)",
+                fromchemProductSpec = "Polymeric Crack Paste",
+                boundingBox = DefectBoundingBox(0.35f, 0.58f, 0.72f, 0.88f)
+            )
+        )
     ),
     StructuralPreset(
         id = "preset_ceiling_leak",
@@ -94,7 +127,37 @@ val sampleStructuralPresets = listOf(
         severityColor = Color(0xFFD32F2F),
         chemicalSpec = "Elastomeric Rubberized Polymer / Two-Component 2-K / Reflective White Membrane",
         description = "Inter-floor slab water penetration. Highly flexible Elastomeric Rubber Coating, high-bond 2-K Acrylic-Cementitious Coating, or UV-resistant White Membrane stops overhead moisture ingress completely.",
-        icon = Icons.Default.WaterDrop
+        icon = Icons.Default.WaterDrop,
+        defects = listOf(
+            DetectedDefect(
+                id = "preset_ceil_1",
+                problemTitle = "Overhead Slab Porosity & Water Staining",
+                shortLabel = "Ceiling Leak",
+                location = "Central overhead concrete slab",
+                severity = "HIGH",
+                confidenceScore = 94,
+                visualEvidence = "Circular discolored water stain with peeling paint halo on the ceiling.",
+                likelyCause = "Water seepage from upper floor wet area, terrace ponding, or plumbing pipe run (exact ingress point unconfirmed without overhead access).",
+                recommendedAction = "Investigate source on upper floor, seal micro-capillaries, and apply flexible waterproof slurry.",
+                fromchemSolution = "Elastomeric Rubber Coating or 2-K Coating or White Membrane",
+                fromchemProductSpec = "Two-Component 2-K Acrylic-Cementitious Coating / Reflective White Membrane",
+                boundingBox = DefectBoundingBox(0.12f, 0.18f, 0.68f, 0.82f)
+            ),
+            DetectedDefect(
+                id = "preset_ceil_2",
+                problemTitle = "Active Water Droplet Dripping",
+                shortLabel = "Active Drip",
+                location = "Lower contour of ceiling stain",
+                severity = "HIGH",
+                confidenceScore = 91,
+                visualEvidence = "Active suspended water droplet formation at low point of the ceiling.",
+                likelyCause = "Saturated concrete slab allowing gravity water transit through micro-pores.",
+                recommendedAction = "Relieve localized moisture pressure and coat overhead with high-elongation elastomeric membrane.",
+                fromchemSolution = "Elastomeric Rubber Coating or 2-K Coating or White Membrane",
+                fromchemProductSpec = "Elastomeric Rubberized Polymer Membrane",
+                boundingBox = DefectBoundingBox(0.58f, 0.32f, 0.88f, 0.68f)
+            )
+        )
     ),
     StructuralPreset(
         id = "preset_damp_wall",
@@ -107,7 +170,37 @@ val sampleStructuralPresets = listOf(
         severityColor = Color(0xFFF57C00),
         chemicalSpec = "Styrene-Butadiene Rubber (SBR) / Chemical-Resistant Epoxy / Aliphatic PU",
         description = "Ground capillary moisture rising through masonry. High-performance SBR bonding coating, non-porous Epoxy barrier, or flexible Polyurethane (PU) protective film permanently blocks dampness.",
-        icon = Icons.Default.Opacity
+        icon = Icons.Default.Opacity,
+        defects = listOf(
+            DetectedDefect(
+                id = "preset_damp_1",
+                problemTitle = "Capillary Rising Dampness & Paint Blistering",
+                shortLabel = "Rising Damp",
+                location = "Lower wall section along baseboard",
+                severity = "MODERATE",
+                confidenceScore = 96,
+                visualEvidence = "Persistent dark moisture tide-line and bubbling surface paint.",
+                likelyCause = "Capillary action drawing ground moisture up through porous brickwork and plaster.",
+                recommendedAction = "Scrape blistered paint and apply deep-penetrating SBR or epoxy damp-proof barrier.",
+                fromchemSolution = "SBR Coating or Epoxy or PU (Fromchem Damp-Proofing System)",
+                fromchemProductSpec = "Styrene-Butadiene Rubber (SBR) / Chemical-Resistant Epoxy / Aliphatic PU",
+                boundingBox = DefectBoundingBox(0.48f, 0.10f, 0.94f, 0.90f)
+            ),
+            DetectedDefect(
+                id = "preset_damp_2",
+                problemTitle = "Efflorescence & White Mineral Salt Deposits",
+                shortLabel = "Efflorescence",
+                location = "Mid-to-lower wall surface perimeter",
+                severity = "LOW",
+                confidenceScore = 90,
+                visualEvidence = "Crystalline white salt crusting along edge of the damp patch.",
+                likelyCause = "Dissolved sub-surface mineral salts migrating with moisture and crystalizing during evaporation.",
+                recommendedAction = "Dry-brush salt deposits and apply chemical neutralizer wash.",
+                fromchemSolution = "SBR Coating or Epoxy or PU (Fromchem Damp-Proofing System)",
+                fromchemProductSpec = "SBR Slurry with Anti-Efflorescence Primer",
+                boundingBox = DefectBoundingBox(0.25f, 0.15f, 0.55f, 0.85f)
+            )
+        )
     ),
     StructuralPreset(
         id = "preset_basement",
@@ -120,7 +213,37 @@ val sampleStructuralPresets = listOf(
         severityColor = Color(0xFFB71C1C),
         chemicalSpec = "High-Tensile Elastomeric SBS Black Bituminous Membrane",
         description = "Subterranean hydrostatic groundwater penetrating foundation cold joints. Heavy-duty Black Membrane provides complete impervious underground tanking protection against water table pressure.",
-        icon = Icons.Default.Foundation
+        icon = Icons.Default.Foundation,
+        defects = listOf(
+            DetectedDefect(
+                id = "preset_base_1",
+                problemTitle = "Negative Hydrostatic Water Infiltration",
+                shortLabel = "Basement Leak",
+                location = "Subterranean foundation retaining wall",
+                severity = "HIGH",
+                confidenceScore = 95,
+                visualEvidence = "Dark, saturated moisture patterns along subterranean retaining wall joint.",
+                likelyCause = "Subterranean groundwater table pressure penetrating foundation cold joints (exact water source requires perimeter excavation review).",
+                recommendedAction = "Install continuous seamless black membrane waterproofing barrier with perimeter drainage.",
+                fromchemSolution = "Black Membrane (Heavy-Duty Bituminous Tanking Membrane)",
+                fromchemProductSpec = "High-Tensile Elastomeric SBS Black Bituminous Membrane",
+                boundingBox = DefectBoundingBox(0.18f, 0.12f, 0.82f, 0.88f)
+            ),
+            DetectedDefect(
+                id = "preset_base_2",
+                problemTitle = "Cold Joint Groundwater Seepage",
+                shortLabel = "Joint Seepage",
+                location = "Wall-to-slab base joint",
+                severity = "HIGH",
+                confidenceScore = 91,
+                visualEvidence = "Moisture accumulation and localized pooling along bottom cold joint.",
+                likelyCause = "Lack of hydrophilic water-stop or failed external tanking seal.",
+                recommendedAction = "Chisel joint, install swellable seal, and tank with bituminous barrier.",
+                fromchemSolution = "Black Membrane (Heavy-Duty Bituminous Tanking Membrane)",
+                fromchemProductSpec = "Elastomeric Bituminous Tanking System",
+                boundingBox = DefectBoundingBox(0.72f, 0.08f, 0.95f, 0.92f)
+            )
+        )
     )
 )
 
@@ -216,7 +339,8 @@ fun AiLeakScannerDialog(
                             chemicalSpec = it.chemicalSpec,
                             summary = it.description,
                             defectCategory = it.name,
-                            confidence = "96% Match"
+                            confidence = "96% Visual Certainty",
+                            defects = it.defects
                         )
                     } ?: GeminiChatService.getDefaultLeakAnalysis(contextDesc)
             )
@@ -478,6 +602,28 @@ fun AiLeakScannerDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Shared Inspection Result Resolution
+                val currentPreset = selectedPreset ?: sampleStructuralPresets[0]
+                val displayDefects = activeGeminiResult?.defects?.ifEmpty { null }
+                    ?: currentPreset.defects.ifEmpty {
+                        listOf(
+                            DetectedDefect(
+                                id = "defect_primary",
+                                problemTitle = activeGeminiResult?.detectedIssue ?: currentPreset.detectedIssue,
+                                shortLabel = activeGeminiResult?.defectCategory ?: currentPreset.name,
+                                location = "Central inspection area",
+                                severity = if (currentPreset.severityLevel.contains("High", true) || currentPreset.severityLevel.contains("Severe", true)) "HIGH" else "MODERATE",
+                                confidenceScore = 95,
+                                visualEvidence = activeGeminiResult?.summary ?: currentPreset.description,
+                                likelyCause = "Water migration through porous substrate or joint settlement.",
+                                recommendedAction = activeGeminiResult?.suggestedNextStep ?: currentPreset.suggestedNextStep,
+                                fromchemSolution = activeGeminiResult?.recommendedApplication ?: currentPreset.recommendedApplication,
+                                fromchemProductSpec = activeGeminiResult?.chemicalSpec ?: currentPreset.chemicalSpec,
+                                boundingBox = DefectBoundingBox(0.20f, 0.20f, 0.80f, 0.80f)
+                            )
+                        )
+                    }
+
                 // Main Display Box
                 val infiniteScanTransition = rememberInfiniteTransition(label = "camera_hud_scan")
                 val scanLineRatio by infiniteScanTransition.animateFloat(
@@ -540,7 +686,8 @@ fun AiLeakScannerDialog(
                         }
                     }
 
-                    // Camera Viewfinder Reticle Brackets (always visible when image loaded)
+                    // Camera Viewfinder Reticle & Edge-to-Edge Bounding Boxes
+
                     if (capturedBitmap != null || selectedPreset != null) {
                         Canvas(modifier = Modifier.fillMaxSize().padding(12.dp)) {
                             val strokeW = 3.dp.toPx()
@@ -574,9 +721,60 @@ fun AiLeakScannerDialog(
                             }
                         }
 
+                        // Edge-to-Edge Bounding Boxes for Detected Defects
+                        if (!isAnalyzing && displayDefects.isNotEmpty()) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val w = size.width
+                                val h = size.height
+                                displayDefects.forEachIndexed { idx, defect ->
+                                    defect.boundingBox?.let { box ->
+                                        val left = (box.xMin * w).coerceIn(0f, w)
+                                        val top = (box.yMin * h).coerceIn(0f, h)
+                                        val right = (box.xMax * w).coerceIn(left + 20f, w)
+                                        val bottom = (box.yMax * h).coerceIn(top + 20f, h)
+                                        val boxW = right - left
+                                        val boxH = bottom - top
+
+                                        val color = when (defect.severity.uppercase()) {
+                                            "HIGH" -> Color(0xFFFF1744)
+                                            "LOW" -> Color(0xFF00E676)
+                                            else -> Color(0xFFFF9100)
+                                        }
+
+                                        // Semi-transparent defect zone shading
+                                        drawRect(
+                                            color = color.copy(alpha = 0.16f),
+                                            topLeft = Offset(left, top),
+                                            size = Size(boxW, boxH)
+                                        )
+
+                                        // Defect bounding perimeter stroke
+                                        drawRect(
+                                            color = color,
+                                            topLeft = Offset(left, top),
+                                            size = Size(boxW, boxH),
+                                            style = Stroke(width = 2.5f.dp.toPx())
+                                        )
+
+                                        // Corner accent markers on bounding box
+                                        val cLen = 10.dp.toPx().coerceAtMost(boxW / 3f).coerceAtMost(boxH / 3f)
+                                        val cStroke = 3.5f.dp.toPx()
+                                        drawLine(color, Offset(left, top), Offset(left + cLen, top), cStroke)
+                                        drawLine(color, Offset(left, top), Offset(left, top + cLen), cStroke)
+                                        drawLine(color, Offset(right, top), Offset(right - cLen, top), cStroke)
+                                        drawLine(color, Offset(right, top), Offset(right, top + cLen), cStroke)
+                                        drawLine(color, Offset(left, bottom), Offset(left + cLen, bottom), cStroke)
+                                        drawLine(color, Offset(left, bottom), Offset(left, bottom - cLen), cStroke)
+                                        drawLine(color, Offset(right, bottom), Offset(right - cLen, bottom), cStroke)
+                                        drawLine(color, Offset(right, bottom), Offset(right, bottom - cLen), cStroke)
+                                    }
+                                }
+                            }
+                        }
+
                         // Autonomous Result Overlays on the Viewfinder
-                        if (!isAnalyzing && activeGeminiResult != null) {
-                            // Top Banner: Autonomous Defect Detection
+                        if (!isAnalyzing && (activeGeminiResult != null || selectedPreset != null)) {
+                            // Top Banner: Edge-to-edge Multi-Defect Detection Count
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
@@ -584,7 +782,7 @@ fun AiLeakScannerDialog(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
-                                    color = Color.Black.copy(alpha = 0.75f),
+                                    color = Color.Black.copy(alpha = 0.82f),
                                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.8f))
                                 ) {
                                     Row(
@@ -598,14 +796,14 @@ fun AiLeakScannerDialog(
                                         ) {}
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "AUTO-DETECTED: ${activeGeminiResult?.defectCategory ?: "Wall Crack"}",
+                                            text = "EDGE-TO-EDGE SCAN: ${displayDefects.size} DEFECT${if (displayDefects.size > 1) "S" else ""} FOUND",
                                             color = Color.White,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = activeGeminiResult?.confidence ?: "96% Match",
+                                            text = activeGeminiResult?.confidence ?: "96% Certainty",
                                             color = Color(0xFF69F0AE),
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.SemiBold
@@ -614,7 +812,11 @@ fun AiLeakScannerDialog(
                                 }
                             }
 
-                            // Bottom Pill: Recommended Product
+                            // Bottom Pill: Recommended Primary Product
+                            val primarySolution = displayDefects.firstOrNull()?.fromchemSolution
+                                ?: activeGeminiResult?.recommendedApplication
+                                ?: currentPreset.recommendedApplication
+
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
@@ -622,7 +824,7 @@ fun AiLeakScannerDialog(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
-                                    color = Color(0xFF0A2540).copy(alpha = 0.90f),
+                                    color = Color(0xFF0A2540).copy(alpha = 0.92f),
                                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8))
                                 ) {
                                     Row(
@@ -637,7 +839,7 @@ fun AiLeakScannerDialog(
                                         )
                                         Spacer(modifier = Modifier.width(5.dp))
                                         Text(
-                                            text = "Product: ${activeGeminiResult?.recommendedApplication ?: "Crack Paste"}",
+                                            text = "Solution: $primarySolution",
                                             color = Color.White,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
@@ -679,7 +881,7 @@ fun AiLeakScannerDialog(
                                 )
 
                                 Text(
-                                    text = "Detecting from image: Wall Crack • Moisture • Ceiling Leakage • Damp Wall",
+                                    text = "Edge-to-edge inspection: Wall Cracks • Moisture • Ceiling Leaks • Damp Walls • Joints",
                                     color = Color(0xFF38BDF8),
                                     fontSize = 10.sp,
                                     modifier = Modifier.padding(top = 4.dp),
@@ -693,11 +895,16 @@ fun AiLeakScannerDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Diagnostic Result View
-                val currentPreset = selectedPreset ?: sampleStructuralPresets[0]
                 val currentCategory = activeGeminiResult?.defectCategory ?: currentPreset.name
-                val currentDetectedIssue = activeGeminiResult?.detectedIssue ?: currentPreset.detectedIssue
-                val currentRecommendedApplication = activeGeminiResult?.recommendedApplication ?: currentPreset.recommendedApplication
-                val currentSuggestedNextStep = activeGeminiResult?.suggestedNextStep ?: currentPreset.suggestedNextStep
+                val currentDetectedIssue = displayDefects.firstOrNull()?.problemTitle
+                    ?: activeGeminiResult?.detectedIssue
+                    ?: currentPreset.detectedIssue
+                val currentRecommendedApplication = displayDefects.firstOrNull()?.fromchemSolution
+                    ?: activeGeminiResult?.recommendedApplication
+                    ?: currentPreset.recommendedApplication
+                val currentSuggestedNextStep = displayDefects.firstOrNull()?.recommendedAction
+                    ?: activeGeminiResult?.suggestedNextStep
+                    ?: currentPreset.suggestedNextStep
                 val currentSeverityLevel = activeGeminiResult?.severityLevel ?: currentPreset.severityLevel
                 val currentSummary = activeGeminiResult?.summary ?: currentPreset.description
 
@@ -727,7 +934,7 @@ fun AiLeakScannerDialog(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "AI DIAGNOSTIC REPORT",
+                                text = "AI VISUAL INSPECTION REPORT",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = FromchemPrimary,
@@ -778,9 +985,97 @@ fun AiLeakScannerDialog(
                         }
                     }
 
+                    // Quality Warning if image was insufficient
+                    if (activeGeminiResult?.isImageQualityInsufficient == true) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFFFF3E0),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB74D)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color(0xFFE65100),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Image Quality Insufficient for Reliable Inspection",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFE65100)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (activeGeminiResult?.imageQualityMessage?.isNotBlank() == true) {
+                                        activeGeminiResult!!.imageQualityMessage
+                                    } else {
+                                        "Image quality is insufficient for a reliable inspection. Please capture a clearer, closer image with the defective area fully visible."
+                                    },
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFBF360C)
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Recommended Photos for Complete Assessment:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFE65100)
+                                )
+                                val angleList = if (activeGeminiResult?.suggestedAdditionalImages?.isNotEmpty() == true) {
+                                    activeGeminiResult!!.suggestedAdditionalImages
+                                } else {
+                                    listOf(
+                                        "1. Wide overview showing the entire wall, ceiling, or floor section",
+                                        "2. Close-up photo directly centered on the defect",
+                                        "3. Nearby adjacent wall, ceiling, or roof area",
+                                        "4. Possible water-source area (plumbing, exterior wall, or roof drain)"
+                                    )
+                                }
+                                angleList.forEach { angle ->
+                                    Text(
+                                        text = "• $angle",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF795548),
+                                        modifier = Modifier.padding(vertical = 1.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = { cameraLauncher.launch() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(34.dp)
+                                    ) {
+                                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Retake Photo", fontSize = 11.sp)
+                                    }
+                                    OutlinedButton(
+                                        onClick = { galleryLauncher.launch("image/*") },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(34.dp)
+                                    ) {
+                                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Choose Clearer Image", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Autonomous Defect Classification Feature Card
+                    // Inspection Summary Card
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = Color(0xFF0F172A),
@@ -813,7 +1108,7 @@ fun AiLeakScannerDialog(
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "AUTONOMOUS DETECTION",
+                                        text = "EDGE-TO-EDGE INSPECTION",
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF94A3B8),
@@ -825,7 +1120,7 @@ fun AiLeakScannerDialog(
                                         color = FromchemAccentGreen
                                     ) {
                                         Text(
-                                            text = "FROM IMAGE PIXELS",
+                                            text = "${displayDefects.size} DEFECT${if (displayDefects.size > 1) "S" else ""}",
                                             fontSize = 8.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White,
@@ -835,74 +1130,295 @@ fun AiLeakScannerDialog(
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = currentCategory,
-                                    fontSize = 14.sp,
+                                    text = currentDetectedIssue,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
                                 Text(
-                                    text = "Camera identified: ${activeGeminiResult?.confidence ?: "96% Match"}",
-                                    fontSize = 10.sp,
-                                    color = Color(0xFF38BDF8)
+                                    text = currentSummary,
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF94A3B8),
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // All Detected Defects Section Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ALL DETECTED DEFECTS (${displayDefects.size})",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = FromchemTextPrimary,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(
+                            text = "Edge-to-Edge Analysis",
+                            fontSize = 10.sp,
+                            color = FromchemTextMuted
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // 1. Detected Issue
-                    DiagnosticFieldCard(
-                        icon = Icons.Default.Search,
-                        label = "Detected Issue",
-                        value = currentDetectedIssue,
-                        valueColor = FromchemTextPrimary,
-                        containerColor = FromchemSurfaceVariant
-                    )
+                    // List of Each Detected Defect Card
+                    displayDefects.forEachIndexed { index, defect ->
+                        val defectColor = when (defect.severity.uppercase()) {
+                            "HIGH" -> Color(0xFFD32F2F)
+                            "LOW" -> Color(0xFF2E7D32)
+                            else -> Color(0xFFF57C00)
+                        }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, defectColor.copy(alpha = 0.35f)),
+                            shadowElevation = 1.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                // Defect Card Header
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = defectColor.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = "#${index + 1}",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = defectColor,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = defect.problemTitle,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = FromchemTextPrimary
+                                        )
+                                    }
 
-                    // 2. Recommended Application
-                    DiagnosticFieldCard(
-                        icon = Icons.Default.Science,
-                        label = "Recommended Chemical Application",
-                        value = currentRecommendedApplication,
-                        valueColor = FromchemPrimary,
-                        containerColor = FromchemPrimaryContainer
-                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = defectColor.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = defect.severity.uppercase(),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = defectColor,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
 
-                    // 3. Suggested Next Step
-                    DiagnosticFieldCard(
-                        icon = Icons.Default.FactCheck,
-                        label = "Suggested Next Step",
-                        value = currentSuggestedNextStep,
-                        valueColor = FromchemAccentGreen,
-                        containerColor = Color(0xFFE8F5E9)
-                    )
+                                // Defect Location & Confidence
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Place,
+                                            contentDescription = null,
+                                            tint = FromchemPrimary,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = defect.location,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = FromchemTextSecondary
+                                        )
+                                    }
+
+                                    Text(
+                                        text = "${defect.confidenceScore}% Visual Certainty",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = FromchemAccentGreen
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                HorizontalDivider(color = FromchemBorder.copy(alpha = 0.5f))
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Visual Evidence Observed
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Icon(
+                                        imageVector = Icons.Default.Visibility,
+                                        contentDescription = null,
+                                        tint = Color(0xFF0284C7),
+                                        modifier = Modifier.size(14.dp).padding(top = 1.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text(
+                                            text = "Visual Evidence Observed",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0284C7)
+                                        )
+                                        Text(
+                                            text = defect.visualEvidence,
+                                            fontSize = 11.sp,
+                                            color = FromchemTextPrimary
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // Likely Cause (Clearly labeled as likely vs confirmed)
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Icon(
+                                        imageVector = Icons.Default.HelpOutline,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF57C00),
+                                        modifier = Modifier.size(14.dp).padding(top = 1.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text(
+                                            text = "Likely Cause (Visual Hypothesis)",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFF57C00)
+                                        )
+                                        Text(
+                                            text = defect.likelyCause,
+                                            fontSize = 11.sp,
+                                            color = FromchemTextSecondary
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // Practical Recommended Action
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Icon(
+                                        imageVector = Icons.Default.Build,
+                                        contentDescription = null,
+                                        tint = FromchemAccentGreen,
+                                        modifier = Modifier.size(14.dp).padding(top = 1.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text(
+                                            text = "Recommended Remedial Action",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = FromchemAccentGreen
+                                        )
+                                        Text(
+                                            text = defect.recommendedAction,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = FromchemTextPrimary
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Matched FromChem Chemical Solution
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = FromchemPrimaryContainer.copy(alpha = 0.55f),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, FromchemPrimary.copy(alpha = 0.25f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Science,
+                                            contentDescription = null,
+                                            tint = FromchemPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = "MATCHED FROMCHEM SOLUTION",
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = FromchemPrimary,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                            Text(
+                                                text = defect.fromchemSolution,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = FromchemPrimary
+                                            )
+                                            if (defect.fromchemProductSpec.isNotBlank()) {
+                                                Text(
+                                                    text = defect.fromchemProductSpec,
+                                                    fontSize = 10.sp,
+                                                    color = FromchemTextSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Technical Detail Spec Box
+                    // Safety & Technical Limitation Note
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFFF8FAFC),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, FromchemBorder),
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "CHEMICAL DIAGNOSTIC SUMMARY",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = FromchemTextMuted
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = Color(0xFF64748B),
+                                modifier = Modifier.size(16.dp).padding(top = 1.dp)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = currentSummary,
-                                fontSize = 12.sp,
-                                color = FromchemTextSecondary
+                                text = activeGeminiResult?.safetyLimitationNote
+                                    ?: "AI is an automated visual inspection assistant, not a licensed structural engineer. Professional on-site physical inspection is recommended for major structural defects or hidden moisture paths. An image alone cannot confirm the exact origin of water ingress.",
+                                fontSize = 10.sp,
+                                color = Color(0xFF64748B),
+                                lineHeight = 14.sp
                             )
                         }
                     }

@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import com.example.data.GalleryStorageManager
+import java.util.UUID
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,12 +98,12 @@ val sampleGalleryProjects = listOf(
         durability = "25 Years Warranty",
         description = "Seamless elastomeric liquid spray coating applied directly over old concrete deck. 100% monolithic, jointless water barrier cured in 10 seconds.",
         testResult = "Hydrostatic Water Ponding Test Passed (72 Hours Zero Leak)",
-        photoCount = 4,
+        photoCount = 0,
         primaryColor = Color(0xFF0288D1),
         secondaryColor = Color(0xFF00ACC1),
-        beforeRes = R.drawable.skyline_rooftop_before,
-        afterRes = R.drawable.skyline_rooftop_after,
-        comparisonRes = R.drawable.skyline_rooftop_comparison
+        beforeRes = null,
+        afterRes = null,
+        comparisonRes = null
     ),
     GalleryProject(
         id = "proj_02",
@@ -113,12 +115,12 @@ val sampleGalleryProjects = listOf(
         durability = "Lifetime Concrete Self-Healing",
         description = "High-pressure chemical polyurethane injection grouting and deep crystalline slurry applied directly to leaking basement retaining wall cracks under hydrostatic groundwater pressure.",
         testResult = "12 Bar Positive & Negative Hydrostatic Pressure Tested",
-        photoCount = 5,
+        photoCount = 0,
         primaryColor = Color(0xFF388E3C),
         secondaryColor = Color(0xFF66BB6A),
-        beforeRes = R.drawable.basement_tanking_before,
-        afterRes = R.drawable.basement_tanking_after,
-        comparisonRes = R.drawable.basement_tanking_comparison
+        beforeRes = null,
+        afterRes = null,
+        comparisonRes = null
     ),
     GalleryProject(
         id = "proj_03",
@@ -130,9 +132,12 @@ val sampleGalleryProjects = listOf(
         durability = "30 Years Heavy Traffic Endurance",
         description = "Heavy duty anti-corrosive chemical layer resistant to salts, de-icing chemicals, freeze-thaw cycles, and heavy vehicle vibration stress.",
         testResult = "ISO 9001 Crack Bridging Capacity 3.2mm Verified",
-        photoCount = 3,
+        photoCount = 0,
         primaryColor = Color(0xFFD32F2F),
-        secondaryColor = Color(0xFFE53935)
+        secondaryColor = Color(0xFFE53935),
+        beforeRes = null,
+        afterRes = null,
+        comparisonRes = null
     ),
     GalleryProject(
         id = "proj_04",
@@ -144,9 +149,12 @@ val sampleGalleryProjects = listOf(
         durability = "20 Years Flex Coating",
         description = "UV-stable cold liquid applied polyurethane membrane designed for planter boxes, pedestrian plaza walkways, and structural expansion joints.",
         testResult = "400% Elongation at Break Certified",
-        photoCount = 4,
+        photoCount = 0,
         primaryColor = Color(0xFF7B1FA2),
-        secondaryColor = Color(0xFFAB47BC)
+        secondaryColor = Color(0xFFAB47BC),
+        beforeRes = null,
+        afterRes = null,
+        comparisonRes = null
     ),
     GalleryProject(
         id = "proj_05",
@@ -158,9 +166,12 @@ val sampleGalleryProjects = listOf(
         durability = "15 Years High Reflectance",
         description = "High SRI solar reflective thermal insulation coating combined with waterproof chemical polymers to reduce indoor temperature by up to 8°C.",
         testResult = "SRI Index 106 Certified (Energy Saving)",
-        photoCount = 3,
+        photoCount = 0,
         primaryColor = Color(0xFFF57C00),
-        secondaryColor = Color(0xFFFFB74D)
+        secondaryColor = Color(0xFFFFB74D),
+        beforeRes = null,
+        afterRes = null,
+        comparisonRes = null
     ),
     GalleryProject(
         id = "proj_06",
@@ -172,9 +183,12 @@ val sampleGalleryProjects = listOf(
         durability = "20 Years Potable Safe",
         description = "Solvent-free epoxy chemical coating approved for drinking water reservoirs, chemical retention basins, and effluent treatment plants.",
         testResult = "BS 6920 Non-Toxic Drinking Water Certified",
-        photoCount = 4,
+        photoCount = 0,
         primaryColor = Color(0xFF00796B),
-        secondaryColor = Color(0xFF26A69A)
+        secondaryColor = Color(0xFF26A69A),
+        beforeRes = null,
+        afterRes = null,
+        comparisonRes = null
     )
 )
 
@@ -301,7 +315,10 @@ fun ProjectGallerySection(
     isWideScreen: Boolean,
     modifier: Modifier = Modifier
 ) {
-    var projectsList by remember { mutableStateOf(sampleGalleryProjects) }
+    val context = LocalContext.current
+    var projectsList by remember {
+        mutableStateOf(GalleryStorageManager.loadProjects(context))
+    }
     val categories = listOf("All Projects", "Roof Waterproofing", "Basement Tanking", "Bridge & Infrastructure", "Podiums & Plazas")
     var selectedCategory by remember { mutableStateOf("All Projects") }
 
@@ -313,12 +330,14 @@ fun ProjectGallerySection(
         }
     }
 
-    val pagerState = rememberPagerState(pageCount = { filteredProjects.size })
+    val pagerState = rememberPagerState(pageCount = { maxOf(1, filteredProjects.size) })
     val coroutineScope = rememberCoroutineScope()
 
     var activeLightboxProject by remember { mutableStateOf<GalleryProject?>(null) }
     var uploadTargetProject by remember { mutableStateOf<GalleryProject?>(null) }
     var showUploadModal by remember { mutableStateOf(false) }
+    var showAddProjectModal by remember { mutableStateOf(false) }
+    var projectToDelete by remember { mutableStateOf<GalleryProject?>(null) }
 
     Column(
         modifier = modifier
@@ -370,85 +389,112 @@ fun ProjectGallerySection(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "Verified original photos directly from real construction sites. Never AI-generated or replaced.",
+                text = "Verified original photos directly from real construction sites. Stored permanently on device.",
                 fontSize = 13.sp,
                 color = FromchemTextSecondary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Direct User Photo Upload Action Button
-            Button(
-                onClick = {
-                    uploadTargetProject = filteredProjects.firstOrNull() ?: sampleGalleryProjects[1]
-                    showUploadModal = true
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
-                shape = RoundedCornerShape(20.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                modifier = Modifier.testTag("upload_real_project_photo_button")
+            // Action Buttons: Primary Add to Gallery Button
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.AddPhotoAlternate,
-                    contentDescription = "Upload Real Photo",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Upload Original Project Photos",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Category Filter Chips
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(categories) { cat ->
-                val isSelected = cat == selectedCategory
-                FilterChip(
-                    selected = isSelected,
-                    onClick = {
-                        selectedCategory = cat
-                        coroutineScope.launch {
-                            pagerState.scrollToPage(0)
-                        }
-                    },
-                    label = {
-                        Text(
-                            text = cat,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = FromchemPrimary,
-                        selectedLabelColor = Color.White,
-                        containerColor = FromchemSurfaceVariant,
-                        labelColor = FromchemTextPrimary
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = isSelected,
-                        borderColor = FromchemBorder,
-                        selectedBorderColor = FromchemPrimary
+                Button(
+                    onClick = { showAddProjectModal = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 9.dp),
+                    modifier = Modifier.testTag("add_gallery_photo_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AddPhotoAlternate,
+                        contentDescription = "Add to Gallery",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
                     )
-                )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Add to Gallery",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                if (filteredProjects.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = {
+                            uploadTargetProject = filteredProjects.getOrNull(pagerState.currentPage) ?: filteredProjects.firstOrNull()
+                            showUploadModal = true
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp),
+                        modifier = Modifier.testTag("upload_to_selected_project_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileUpload,
+                            contentDescription = "Upload Photos",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Upload Photos",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Category Filter Chips (visible if projects exist)
+        if (projectsList.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(categories) { cat ->
+                    val isSelected = cat == selectedCategory
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {
+                            selectedCategory = cat
+                            coroutineScope.launch {
+                                pagerState.scrollToPage(0)
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = cat,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = FromchemPrimary,
+                            selectedLabelColor = Color.White,
+                            containerColor = FromchemSurfaceVariant,
+                            labelColor = FromchemTextPrimary
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = FromchemBorder,
+                            selectedBorderColor = FromchemPrimary
+                        )
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         if (filteredProjects.isNotEmpty()) {
             // Gallery Swiper Pager
@@ -471,6 +517,9 @@ fun ProjectGallerySection(
                             onUploadPhotosClick = {
                                 uploadTargetProject = project
                                 showUploadModal = true
+                            },
+                            onDeleteProjectClick = {
+                                projectToDelete = project
                             },
                             onGetQuoteClick = { onGetQuoteForProject(project.title) },
                             isWideScreen = isWideScreen
@@ -571,6 +620,124 @@ fun ProjectGallerySection(
                     fontWeight = FontWeight.Medium
                 )
             }
+        } else {
+            // Empty State
+            if (projectsList.isEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = FromchemSurfaceVariant),
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = FromchemPrimaryContainer,
+                            modifier = Modifier.size(72.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = null,
+                                    tint = FromchemPrimary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "No Gallery Photos Yet",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = FromchemTextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "All sample images have been cleared. Tap 'Add to Gallery' to upload your real project photos. Uploaded photos will remain stored permanently on your device even after closing the app.",
+                            fontSize = 13.sp,
+                            color = FromchemTextSecondary,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 18.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Button(
+                            onClick = { showAddProjectModal = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                            modifier = Modifier.testTag("add_gallery_empty_state_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Add to Gallery",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Filter returned 0 results
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = FromchemSurfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No projects found under \"$selectedCategory\"",
+                            fontSize = 14.sp,
+                            color = FromchemTextSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { selectedCategory = "All Projects" },
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Text("View All Projects")
+                            }
+                            Button(
+                                onClick = { showAddProjectModal = true },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary)
+                            ) {
+                                Text("Add Project")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -586,7 +753,7 @@ fun ProjectGallerySection(
         )
     }
 
-    // Direct User Upload Dialog
+    // Direct User Upload Dialog (For an existing project)
     if (showUploadModal && uploadTargetProject != null) {
         UploadProjectPhotosDialog(
             project = uploadTargetProject!!,
@@ -595,12 +762,50 @@ fun ProjectGallerySection(
                 uploadTargetProject = null
             },
             onPhotosUploaded = { updatedProject ->
-                // Update project list in memory with the authoritative uploaded image references
-                projectsList = projectsList.map {
-                    if (it.id == updatedProject.id) updatedProject else it
-                }
+                // Reload authoritative list from local disk
+                projectsList = GalleryStorageManager.loadProjects(context)
                 showUploadModal = false
                 uploadTargetProject = null
+            }
+        )
+    }
+
+    // Add New Gallery Project / Photo Modal
+    if (showAddProjectModal) {
+        AddGalleryImageDialog(
+            onDismiss = { showAddProjectModal = false },
+            onProjectCreated = { createdProject ->
+                // Reload authoritative list from local disk
+                projectsList = GalleryStorageManager.loadProjects(context)
+                showAddProjectModal = false
+            }
+        )
+    }
+
+    // Delete Confirmation Dialog
+    if (projectToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { projectToDelete = null },
+            title = { Text("Delete Project", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to permanently remove \"${projectToDelete?.title}\" and its photos from your gallery?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        projectToDelete?.let {
+                            projectsList = GalleryStorageManager.deleteProject(context, it.id)
+                            Toast.makeText(context, "Project removed from gallery", Toast.LENGTH_SHORT).show()
+                        }
+                        projectToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) {
+                    Text("Delete", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { projectToDelete = null }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -615,6 +820,7 @@ fun GalleryProjectCard(
     project: GalleryProject,
     onInspectClick: () -> Unit,
     onUploadPhotosClick: () -> Unit,
+    onDeleteProjectClick: () -> Unit,
     onGetQuoteClick: () -> Unit,
     isWideScreen: Boolean,
     modifier: Modifier = Modifier
@@ -755,6 +961,22 @@ fun GalleryProjectCard(
                                 imageVector = Icons.Default.Expand,
                                 contentDescription = "Fullscreen Photo Gallery",
                                 tint = FromchemPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        // Delete Project Button
+                        IconButton(
+                            onClick = onDeleteProjectClick,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.9f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = "Delete project from gallery",
+                                tint = Color(0xFFD32F2F),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -1543,19 +1765,26 @@ fun UploadProjectPhotosDialog(
                 // Confirm Save Button
                 Button(
                     onClick = {
+                        // Persist all uploaded images locally into app private files directory permanently
+                        val permanentBefore = uploadedBeforeUri?.let { GalleryStorageManager.persistImageLocally(context, it) } ?: project.userUploadedBeforeUri
+                        val permanentAfter = uploadedAfterUri?.let { GalleryStorageManager.persistImageLocally(context, it) } ?: project.userUploadedAfterUri
+                        val permanentList = uploadedList.mapNotNull { GalleryStorageManager.persistImageLocally(context, it) }
+                        val combinedOriginal = (permanentList + project.userUploadedOriginalUris).distinct()
+
                         val updated = project.copy(
-                            userUploadedBeforeUri = uploadedBeforeUri,
-                            userUploadedAfterUri = uploadedAfterUri,
-                            userUploadedOriginalUris = if (uploadedList.isNotEmpty()) uploadedList else project.userUploadedOriginalUris,
+                            userUploadedBeforeUri = permanentBefore,
+                            userUploadedAfterUri = permanentAfter,
+                            userUploadedOriginalUris = if (combinedOriginal.isNotEmpty()) combinedOriginal else project.userUploadedOriginalUris,
                             photoCount = maxOf(
                                 project.photoCount,
-                                (if (uploadedBeforeUri != null) 1 else 0) +
-                                        (if (uploadedAfterUri != null) 1 else 0) +
-                                        uploadedList.size
+                                (if (permanentBefore != null) 1 else 0) +
+                                        (if (permanentAfter != null) 1 else 0) +
+                                        combinedOriginal.size
                             )
                         )
+                        GalleryStorageManager.saveOrUpdateProject(context, updated)
                         onPhotosUploaded(updated)
-                        Toast.makeText(context, "Real project photos updated in gallery", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Real project photos permanently saved to gallery", Toast.LENGTH_SHORT).show()
                     },
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
@@ -1570,7 +1799,456 @@ fun UploadProjectPhotosDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Save & Display in Project Gallery",
+                        text = "Save Permanently to Gallery",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Add Gallery Image Dialog.
+ * Allows adding a new project or photo entry from the "Add Gallery" section.
+ * Photos are copied to local app internal storage and persisted permanently,
+ * ensuring they remain available even after closing or restarting the app.
+ */
+@Composable
+fun AddGalleryImageDialog(
+    onDismiss: () -> Unit,
+    onProjectCreated: (GalleryProject) -> Unit
+) {
+    val context = LocalContext.current
+    var projectTitle by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("Roof Waterproofing") }
+    var location by remember { mutableStateOf("Ahmedabad, Gujarat") }
+    var areaSize by remember { mutableStateOf("25,000 sq ft") }
+    var chemicalUsed by remember { mutableStateOf("Fromchem Polymeric Waterproofing Membrane") }
+    var description by remember { mutableStateOf("Original site waterproofing application and barrier inspection.") }
+
+    var beforeUri by remember { mutableStateOf<Uri?>(null) }
+    var afterUri by remember { mutableStateOf<Uri?>(null) }
+    var additionalUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val categories = listOf(
+        "Roof Waterproofing",
+        "Basement Tanking",
+        "Bridge & Infrastructure",
+        "Podiums & Plazas",
+        "Wall Crack Repair",
+        "General Waterproofing"
+    )
+
+    val templates = listOf(
+        Triple("Skyline IT Tower Rooftop", "Roof Waterproofing", "Fromchem Pure Polyurea 2000"),
+        Triple("Basement Retaining Wall Injection", "Basement Tanking", "Fromchem Crystalline Deep-Penetrant Slurry"),
+        Triple("Highway Viaduct Bridge Deck", "Bridge & Infrastructure", "Fromchem Hydro-Shield Epoxy Sealant"),
+        Triple("Regal Plaza Podium Deck", "Podiums & Plazas", "Fromchem Elastomeric PU Membrane"),
+        Triple("Custom Project", "Roof Waterproofing", "Fromchem Chemical Waterproofing System")
+    )
+
+    // Photo pickers
+    val beforePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            beforeUri = uri
+            Toast.makeText(context, "Before photo selected", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val afterPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            afterUri = uri
+            Toast.makeText(context, "After photo selected", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val multiPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            additionalUris = uris
+            Toast.makeText(context, "${uris.size} photos selected", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .fillMaxHeight(0.90f)
+                .clip(RoundedCornerShape(24.dp)),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = FromchemPrimaryContainer,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.AddPhotoAlternate,
+                                    contentDescription = null,
+                                    tint = FromchemPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Add to Project Gallery",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = FromchemTextPrimary
+                            )
+                            Text(
+                                text = "Photos stay permanently after closing app",
+                                fontSize = 11.sp,
+                                color = FromchemTextSecondary
+                            )
+                        }
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Permanent Storage Assurance Card
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFE8F5E9),
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Permanent Storage",
+                            tint = FromchemAccentGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "🔒 Permanent Storage: Photos added here are copied to app storage and will remain permanently even after closing or restarting the app.",
+                            fontSize = 11.sp,
+                            color = Color(0xFF1B5E20),
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Quick Templates
+                Text(
+                    text = "Quick Project Templates",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FromchemTextSecondary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(templates) { (tTitle, tCat, tChem) ->
+                        SuggestionChip(
+                            onClick = {
+                                projectTitle = if (tTitle == "Custom Project") "" else tTitle
+                                selectedCategory = tCat
+                                chemicalUsed = tChem
+                            },
+                            label = { Text(tTitle, fontSize = 11.sp) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Project Title Field
+                OutlinedTextField(
+                    value = projectTitle,
+                    onValueChange = { projectTitle = it },
+                    label = { Text("Project Title *") },
+                    placeholder = { Text("e.g. Skyline Rooftop Waterproofing") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Category selector
+                Text(
+                    text = "Category",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FromchemTextSecondary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(categories) { cat ->
+                        val isSelected = cat == selectedCategory
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedCategory = cat },
+                            label = { Text(cat, fontSize = 11.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FromchemPrimary,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Location Field
+                OutlinedTextField(
+                    value = location,
+                    onValueChange = { location = it },
+                    label = { Text("Site Location") },
+                    placeholder = { Text("e.g. Ahmedabad, Gujarat") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Photo 1: Before Photo
+                Text(
+                    text = "1. Before Photo (Raw Substrate / Leak)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FromchemTextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = {
+                            beforePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (beforeUri == null) "Select Before Photo" else "Change Before Photo", fontSize = 12.sp)
+                    }
+                    if (beforeUri != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, FromchemPrimary, RoundedCornerShape(8.dp))
+                        ) {
+                            AsyncImage(
+                                model = beforeUri,
+                                contentDescription = "Before preview",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        IconButton(onClick = { beforeUri = null }) {
+                            Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.Gray)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Photo 2: After Photo
+                Text(
+                    text = "2. After Photo (Completed Waterproofing Barrier)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FromchemTextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = {
+                            afterPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (afterUri == null) "Select After Photo" else "Change After Photo", fontSize = 12.sp)
+                    }
+                    if (afterUri != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, FromchemPrimary, RoundedCornerShape(8.dp))
+                        ) {
+                            AsyncImage(
+                                model = afterUri,
+                                contentDescription = "After preview",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        IconButton(onClick = { afterUri = null }) {
+                            Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.Gray)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Photo 3: Additional Photos
+                Text(
+                    text = "3. Additional Site Photos (Optional, up to 10 photos)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FromchemTextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = {
+                        multiPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Collections, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (additionalUris.isEmpty()) "Choose Additional Photos" else "${additionalUris.size} Photos Selected", fontSize = 12.sp)
+                }
+
+                if (additionalUris.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(additionalUris) { uri ->
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, FromchemBorder, RoundedCornerShape(8.dp))
+                            ) {
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = "Photo preview",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                val hasAtLeastOnePhoto = beforeUri != null || afterUri != null || additionalUris.isNotEmpty()
+                val canSave = projectTitle.isNotBlank() && hasAtLeastOnePhoto && !isSaving
+
+                Button(
+                    onClick = {
+                        if (!canSave) {
+                            if (projectTitle.isBlank()) {
+                                Toast.makeText(context, "Please enter a project title", Toast.LENGTH_SHORT).show()
+                            } else if (!hasAtLeastOnePhoto) {
+                                Toast.makeText(context, "Please select at least one photo", Toast.LENGTH_SHORT).show()
+                            }
+                            return@Button
+                        }
+                        isSaving = true
+
+                        // Persist all images locally into app private files directory
+                        val permanentBefore = beforeUri?.let { GalleryStorageManager.persistImageLocally(context, it) }
+                        val permanentAfter = afterUri?.let { GalleryStorageManager.persistImageLocally(context, it) }
+                        val permanentAdditional = additionalUris.mapNotNull { GalleryStorageManager.persistImageLocally(context, it) }
+
+                        val allPhotos = mutableListOf<Uri>()
+                        permanentBefore?.let { allPhotos.add(it) }
+                        permanentAfter?.let { allPhotos.add(it) }
+                        allPhotos.addAll(permanentAdditional)
+
+                        val newProject = GalleryProject(
+                            id = "proj_${System.currentTimeMillis()}",
+                            title = projectTitle.trim(),
+                            category = selectedCategory,
+                            location = location.trim().ifEmpty { "Site Location" },
+                            areaSize = areaSize,
+                            chemicalUsed = chemicalUsed,
+                            durability = "20 Years Warranty",
+                            description = description,
+                            testResult = "Hydrostatic Water Resistance Tested & Certified",
+                            photoCount = allPhotos.size,
+                            primaryColor = Color(0xFF0288D1),
+                            secondaryColor = Color(0xFF00ACC1),
+                            beforeRes = null,
+                            afterRes = null,
+                            comparisonRes = null,
+                            userUploadedBeforeUri = permanentBefore,
+                            userUploadedAfterUri = permanentAfter ?: permanentAdditional.firstOrNull(),
+                            userUploadedComparisonUri = null,
+                            userUploadedOriginalUris = allPhotos.distinct()
+                        )
+
+                        GalleryStorageManager.saveOrUpdateProject(context, newProject)
+                        onProjectCreated(newProject)
+                        Toast.makeText(context, "Photo permanently added to gallery!", Toast.LENGTH_SHORT).show()
+                    },
+                    enabled = canSave,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FromchemPrimary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isSaving) "Saving Permanently..." else "Save to Permanent Gallery",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
