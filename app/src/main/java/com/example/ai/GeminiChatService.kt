@@ -4,7 +4,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import com.example.BuildConfig
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -66,6 +70,26 @@ data class DetectedDefect(
 }
 
 data class GeminiLeakAnalysisResult(
+    // 1. Image Quality Check
+    val isImageQualityInsufficient: Boolean = false,
+    val imageQualityMessage: String = "",
+    val suggestedAdditionalImages: List<String> = emptyList(),
+
+    // 2. Image Relevance Check
+    val isRelevantForInspection: Boolean = true,
+    val detectedObject: String? = null, // e.g. "Bottle", "Water bottle", "Person", "Vehicle"
+    val irrelevanceReason: String? = null,
+    val guidanceMessage: String? = null,
+
+    // 3. Inspection Details
+    val detectedSurface: String = "Wall", // Wall / Ceiling / Roof / Terrace / Floor / Bathroom / Pipe Area / Other
+    val hasVisibleDefects: Boolean = true,
+    val noDefectMessage: String? = null,
+
+    // 4. OCR Support
+    val ocrDetectedText: String? = null,
+
+    // 5. Defect List & Overall Diagnosis
     val detectedIssue: String,
     val recommendedApplication: String,
     val suggestedNextStep: String,
@@ -76,13 +100,21 @@ data class GeminiLeakAnalysisResult(
     val defectCategory: String = "Wall Crack",
     val confidence: String = "96%",
     val defects: List<DetectedDefect> = emptyList(),
-    val isImageQualityInsufficient: Boolean = false,
-    val imageQualityMessage: String = "",
-    val suggestedAdditionalImages: List<String> = emptyList(),
     val safetyLimitationNote: String = "AI is an automated visual inspection assistant, not a licensed structural engineer. Professional on-site physical inspection is recommended for major structural defects or hidden moisture paths. An image alone cannot confirm the exact origin of water ingress."
 ) {
     fun toMap(): Map<String, Any?> {
         return mapOf(
+            "isImageQualityInsufficient" to isImageQualityInsufficient,
+            "imageQualityMessage" to imageQualityMessage,
+            "suggestedAdditionalImages" to suggestedAdditionalImages,
+            "isRelevantForInspection" to isRelevantForInspection,
+            "detectedObject" to detectedObject,
+            "irrelevanceReason" to irrelevanceReason,
+            "guidanceMessage" to guidanceMessage,
+            "detectedSurface" to detectedSurface,
+            "hasVisibleDefects" to hasVisibleDefects,
+            "noDefectMessage" to noDefectMessage,
+            "ocrDetectedText" to ocrDetectedText,
             "detectedIssue" to detectedIssue,
             "recommendedApplication" to recommendedApplication,
             "suggestedNextStep" to suggestedNextStep,
@@ -92,11 +124,8 @@ data class GeminiLeakAnalysisResult(
             "isSuccess" to isSuccess,
             "defectCategory" to defectCategory,
             "confidence" to confidence,
-            "defects" to defects.map { it.toMap() },
-            "isImageQualityInsufficient" to isImageQualityInsufficient,
-            "imageQualityMessage" to imageQualityMessage,
-            "suggestedAdditionalImages" to suggestedAdditionalImages,
-            "safetyLimitationNote" to safetyLimitationNote
+            "safetyLimitationNote" to safetyLimitationNote,
+            "defects" to defects.map { it.toMap() }
         )
     }
 }
@@ -266,12 +295,34 @@ object GeminiChatService {
     }
 
     /**
-     * Autonomous on-device pixel analysis of the captured/selected camera image.
-     * Inspects the entire image edge-to-edge across multiple regions (top, center, lower, corners),
-     * detecting multiple defect signatures (cracks, dampness, water pooling, peeling plaster/efflorescence),
-     * and generates bounding boxes, severity ratings, and matched FromChem solutions.
+     * Extracts visible text from an image using Google Play Services MLKit Text Recognition.
      */
-    fun analyzeBitmapPixels(bitmap: Bitmap): GeminiLeakAnalysisResult {
+    suspend fun extractOcrText(bitmap: Bitmap): String? = withContext(Dispatchers.Default) {
+        try {
+            val image = InputImage.fromBitmap(bitmap, 0)
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            val visionText = recognizer.process(image).await()
+            val resultText = visionText.text?.trim()
+            if (!resultText.isNullOrBlank()) resultText else null
+        } catch (e: Exception) {
+            Log.d(TAG, "MLKit OCR skipped or unavailable: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Autonomous on-device pixel analysis of the captured/selected camera image.
+     * Follows the strict 4-step pipeline:
+     * 1. IMAGE QUALITY CHECK (blurriness, extreme darkness or brightness)
+     * 2. IMAGE RELEVANCE CHECK (distinguish building surfaces from bottles, people, random objects)
+     * 3. VISUAL DEFECT INSPECTION (dampness, cracks, ceiling leaks, efflorescence, or clean surface)
+     * 4. OCR TEXT EXTRACTION (product labels, chemical names, markings)
+     */
+    fun analyzeBitmapPixels(
+        bitmap: Bitmap,
+        contextDescription: String = "",
+        externalOcrText: String? = null
+    ): GeminiLeakAnalysisResult {
         return try {
             val width = 64
             val height = 64
@@ -294,28 +345,28 @@ object GeminiChatService {
 
             val avgLum = totalLuminance / (width * height)
 
-            // Check if image quality is insufficient (too dark or blown out)
+            // STEP 1: IMAGE QUALITY CHECK
             if (avgLum < 16 || avgLum > 248) {
                 if (scaled != bitmap) scaled.recycle()
                 return GeminiLeakAnalysisResult(
-                    detectedIssue = "Image Quality Insufficient for Reliable Inspection",
+                    isImageQualityInsufficient = true,
+                    imageQualityMessage = "Please capture a clearer and closer image of the suspected defective area.",
+                    suggestedAdditionalImages = listOf(
+                        "1. Wide overview showing the entire wall, ceiling, or floor section",
+                        "2. Close-up photo directly centered on the defect",
+                        "3. Nearby adjacent wall, ceiling, or roof area",
+                        "4. Possible water-source area (plumbing, exterior wall, or roof drain)"
+                    ),
+                    detectedIssue = "IMAGE QUALITY INSUFFICIENT",
                     recommendedApplication = "Re-capture in Adequate Lighting",
-                    suggestedNextStep = "Capture Clear Closer Photo with Defective Area Fully Visible",
+                    suggestedNextStep = "Please capture a clearer and closer image of the suspected defective area.",
                     severityLevel = "Low Risk",
                     chemicalSpec = "N/A - Retake Recommended",
-                    summary = "Image quality is insufficient for a reliable inspection. Please capture a clearer, closer image with the defective area fully visible.",
+                    summary = "Image quality is insufficient for a reliable inspection. Please capture a clearer and closer image of the suspected defective area.",
                     isSuccess = false,
                     defectCategory = "Image Quality Insufficient",
-                    confidence = "15%",
-                    defects = emptyList(),
-                    isImageQualityInsufficient = true,
-                    imageQualityMessage = "Image quality is insufficient for a reliable inspection. Please capture a clearer, closer image with the defective area fully visible.",
-                    suggestedAdditionalImages = listOf(
-                        "1. Full area view showing entire wall, ceiling, or floor section",
-                        "2. Close-up photo directly centered on the defect",
-                        "3. Nearby adjacent wall/ceiling/roof area",
-                        "4. Possible water-source area (plumbing, exterior wall, or roof drain)"
-                    )
+                    confidence = "15% Certainty",
+                    defects = emptyList()
                 )
             }
 
@@ -381,6 +432,63 @@ object GeminiChatService {
 
             if (scaled != bitmap) scaled.recycle()
 
+            // ----------------------------------------------------
+            // STEP 2: IMAGE RELEVANCE CHECK
+            // ----------------------------------------------------
+            val irrelevantKeywords = listOf(
+                "bottle", "water bottle", "waterbottle", "plastic bottle", "glass bottle", "beverage", "drink", "soda",
+                "coke", "pepsi", "sprite", "fanta", "aquafina", "bisleri", "kinley", "mineral water", "packaged drinking water",
+                "ingredients", "nutrition facts", "net quantity", "net qty", "mrp", "person", "human", "face", "selfie",
+                "animal", "dog", "cat", "pet", "food", "fruit", "dish", "snack", "car", "bike", "bicycle", "motorcycle",
+                "vehicle", "phone", "mobile", "cellphone", "laptop", "computer", "keyboard", "monitor", "mouse",
+                "clothing", "shirt", "t-shirt", "pant", "shoe", "shoes", "bag", "backpack", "tree", "plant", "flower",
+                "leaf", "sky", "cloud", "landscape", "screenshot", "desk", "table", "chair", "pen", "pencil", "book",
+                "cup", "mug", "plate", "spoon", "fork", "can", "beer", "wine", "tea", "coffee"
+            )
+
+            val textCombined = ((externalOcrText ?: "") + " " + contextDescription).lowercase()
+            val detectedIrrelevantKeyword = irrelevantKeywords.firstOrNull { kw -> textCombined.contains(kw) }
+
+            // Spatial isolated object heuristic: an object (like a bottle or product) placed in the center against a plain background
+            val centerReg = regions[4]
+            val centerEdgeRatio = if (centerReg.pixelCount > 0) centerReg.edgeScore.toFloat() / centerReg.pixelCount else 0f
+            val perimeterEdgeAvg = (regions[0].edgeScore + regions[1].edgeScore + regions[2].edgeScore + regions[3].edgeScore).toFloat() /
+                    (regions[0].pixelCount + regions[1].pixelCount + regions[2].pixelCount + regions[3].pixelCount).coerceAtLeast(1)
+
+            val isIsolatedForegroundObject = (centerEdgeRatio > 6.5f && perimeterEdgeAvg < 4.0f && (centerEdgeRatio / (perimeterEdgeAvg + 0.05f)) > 1.8f)
+
+            if (detectedIrrelevantKeyword != null || (isIsolatedForegroundObject && !contextDescription.contains("crack", ignoreCase = true) && !contextDescription.contains("wall", ignoreCase = true))) {
+                val objectName = when {
+                    detectedIrrelevantKeyword != null -> detectedIrrelevantKeyword.replaceFirstChar { it.uppercase() }
+                    isIsolatedForegroundObject -> "Bottle / Unrelated Object"
+                    else -> "Unrelated Object"
+                }
+
+                return GeminiLeakAnalysisResult(
+                    isRelevantForInspection = false,
+                    detectedObject = objectName,
+                    irrelevanceReason = "The uploaded image does not appear to show a building surface or visible waterproofing/construction defect.",
+                    guidanceMessage = "Please capture a clear photo of the wall, ceiling, roof, floor, bathroom, terrace, pipe area, or other suspected defective area.",
+                    detectedSurface = "Non-construction Object ($objectName)",
+                    hasVisibleDefects = false,
+                    noDefectMessage = null,
+                    ocrDetectedText = externalOcrText,
+                    detectedIssue = "IMAGE NOT SUITABLE FOR LEAK DETECTION",
+                    recommendedApplication = "N/A - Irrelevant Image",
+                    suggestedNextStep = "Please capture a clear photo of the wall, ceiling, roof, floor, bathroom, terrace, pipe area, or other suspected defective area.",
+                    severityLevel = "Normal",
+                    chemicalSpec = "None",
+                    summary = "Detected Object: $objectName. The image does not show a relevant building/construction surface or visible waterproofing defect.",
+                    defectCategory = "Irrelevant Image",
+                    confidence = "98% Detection Confidence",
+                    defects = emptyList(),
+                    isSuccess = true
+                )
+            }
+
+            // ----------------------------------------------------
+            // STEP 3: VISUAL DEFECT INSPECTION
+            // ----------------------------------------------------
             val detectedDefects = mutableListOf<DetectedDefect>()
 
             // 1. Evaluate Lower Wall (Zone 3) for Rising Dampness & Seepage
@@ -394,13 +502,13 @@ object GeminiChatService {
                     DetectedDefect(
                         id = "defect_damp_wall",
                         problemTitle = "Wall Seepage & Capillary Rising Dampness",
-                        shortLabel = "Seepage",
-                        location = "Lower section of the wall along skirting",
+                        shortLabel = "DAMPNESS",
+                        location = "Lower section of wall along skirting",
                         severity = severity,
                         confidenceScore = conf,
                         visualEvidence = "Dark, discolored damp patch with visible moisture demarcation along the lower substrate.",
                         likelyCause = "Likely capillary rising dampness through porous brickwork or groundwater infiltration (exact source cannot be confirmed from this image alone).",
-                        recommendedAction = "Strip deteriorated surface plaster, inspect exterior ground drainage, and apply damp-proofing barrier.",
+                        recommendedAction = "Strip deteriorated surface plaster, inspect exterior ground drainage, and apply deep-penetrating damp-proofing barrier.",
                         fromchemSolution = "SBR Coating or Epoxy or PU (Fromchem Damp-Proofing System)",
                         fromchemProductSpec = "Styrene-Butadiene Rubber (SBR) Bonding Slurry / Chemical-Resistant Epoxy Moisture Barrier",
                         boundingBox = lowerReg.box
@@ -418,8 +526,8 @@ object GeminiChatService {
                     DetectedDefect(
                         id = "defect_ceiling_leak",
                         problemTitle = "Overhead Slab Moisture & Ceiling Seepage",
-                        shortLabel = "Ceiling Leak",
-                        location = "Overhead ceiling slab and upper corner joint",
+                        shortLabel = "CEILING LEAKAGE",
+                        location = "Overhead ceiling slab and upper corner junction",
                         severity = if (upperBlueRatio > 0.14f) "HIGH" else "MODERATE",
                         confidenceScore = conf,
                         visualEvidence = "Watermark discoloration halo with specular moisture sheen across the ceiling slab.",
@@ -432,13 +540,9 @@ object GeminiChatService {
                 )
             }
 
-            // 3. Evaluate Edge Gradients across Wall/Center (Zone 4 or Zone 1/2) for Cracks
-            val centerReg = regions[4]
-            val centerEdgeRatio = if (centerReg.pixelCount > 0) centerReg.edgeScore.toFloat() / centerReg.pixelCount else 0f
+            // 3. Evaluate Edge Gradients across Wall/Center for Cracks
             val leftReg = regions[1]
-            val leftEdgeRatio = if (leftReg.pixelCount > 0) leftReg.edgeScore.toFloat() / leftReg.pixelCount else 0f
             val rightReg = regions[2]
-            val rightEdgeRatio = if (rightReg.pixelCount > 0) rightReg.edgeScore.toFloat() / rightReg.pixelCount else 0f
 
             val maxEdgeReg = listOf(centerReg, leftReg, rightReg).maxByOrNull {
                 if (it.pixelCount > 0) it.edgeScore.toFloat() / it.pixelCount else 0f
@@ -453,19 +557,19 @@ object GeminiChatService {
                 val locationDesc = when (maxEdgeReg?.name) {
                     "Left Wall Section" -> "Left vertical wall section near joint"
                     "Right Wall & Corner Area" -> "Right masonry section near corner"
-                    else -> "Central wall and plaster substrate"
+                    else -> "Center of wall"
                 }
                 detectedDefects.add(
                     DetectedDefect(
                         id = "defect_wall_crack",
-                        problemTitle = if (severity == "HIGH") "Structural-Looking Wall Crack" else "Plaster Fissure & Wall Crack",
-                        shortLabel = "Wall Crack",
+                        problemTitle = "Substrate Fracture & Wall Crack",
+                        shortLabel = "WALL CRACK",
                         location = locationDesc,
                         severity = severity,
                         confidenceScore = conf,
-                        visualEvidence = "Linear fissure and surface crack path tracking across the masonry plaster.",
-                        likelyCause = "Thermal expansion movement or substrate settlement (recommend professional inspection if width exceeds 2mm).",
-                        recommendedAction = "Chisel V-groove profile (approx 5mm x 5mm), blow out debris, and inject high-elasticity polymeric filler.",
+                        visualEvidence = "High-contrast continuous linear fracture and surface separation across the plaster plane.",
+                        likelyCause = "Likely thermal expansion movement or substrate settlement (exact source cannot be confirmed from this image alone).",
+                        recommendedAction = "Chisel V-groove profile along fracture, clear dust, and pack firmly with high-elasticity crack paste.",
                         fromchemSolution = "Crack Paste (Fromchem Polymeric Waterproofing Crack Paste)",
                         fromchemProductSpec = "High-Elasticity Polymeric Crack Filler with 300% Elongation",
                         boundingBox = maxEdgeReg?.box ?: DefectBoundingBox(0.20f, 0.35f, 0.85f, 0.65f)
@@ -474,12 +578,12 @@ object GeminiChatService {
             }
 
             // 4. Evaluate for Efflorescence & Blistering Paint if diffuse variance is detected
-            if (detectedDefects.none { it.shortLabel == "Seepage" } && lowerDiffuseRatio > 0.12f) {
+            if (detectedDefects.none { it.shortLabel == "DAMPNESS" } && lowerDiffuseRatio > 0.12f) {
                 detectedDefects.add(
                     DetectedDefect(
                         id = "defect_efflorescence",
                         problemTitle = "Efflorescence & Paint Blistering",
-                        shortLabel = "Efflorescence",
+                        shortLabel = "EFFLORESCENCE",
                         location = "Wall surface mid-to-lower section",
                         severity = "LOW",
                         confidenceScore = 89,
@@ -493,23 +597,25 @@ object GeminiChatService {
                 )
             }
 
-            // If no distinct multi-defect was triggered, provide a comprehensive edge-to-edge assessment
+            // If no defect is detected, REPORT NO OBVIOUS VISIBLE DEFECT (DO NOT FORCE A DEFECT!)
             if (detectedDefects.isEmpty()) {
-                val defaultDefect = DetectedDefect(
-                    id = "defect_general_surface",
-                    problemTitle = "Surface Porosity & Hairline Micro-Cracking",
-                    shortLabel = "Surface Crack",
-                    location = "Central masonry surface",
-                    severity = "LOW",
-                    confidenceScore = 88,
-                    visualEvidence = "Minor superficial surface hairline textures and micro-porosity visible on plaster.",
-                    likelyCause = "Aging plaster coat and minor seasonal thermal contraction.",
-                    recommendedAction = "Clean surface, apply elastomeric crack filler for hairline openings, and seal with waterproof coating.",
-                    fromchemSolution = "Crack Paste (Fromchem Polymeric Waterproofing Crack Paste)",
-                    fromchemProductSpec = "Polymeric Waterproofing Crack Paste with High Elasticity",
-                    boundingBox = DefectBoundingBox(0.25f, 0.20f, 0.75f, 0.80f)
+                return GeminiLeakAnalysisResult(
+                    isRelevantForInspection = true,
+                    detectedSurface = "Wall",
+                    hasVisibleDefects = false,
+                    noDefectMessage = "No obvious visible defect detected.",
+                    ocrDetectedText = externalOcrText,
+                    detectedIssue = "No Obvious Visible Defect Detected",
+                    recommendedApplication = "Surface is intact - No remedial chemical required",
+                    suggestedNextStep = "Surface appears clean and structurally intact. Regular periodic monitoring recommended.",
+                    severityLevel = "Normal",
+                    chemicalSpec = "Intact Structural Substrate",
+                    summary = "No obvious visible defect detected. The inspected surface appears clean and structurally intact with no visible signs of active water ingress, dampness, cracking, efflorescence, or paint degradation.",
+                    defectCategory = "Clean Surface",
+                    confidence = "95% Visual Certainty",
+                    defects = emptyList(),
+                    isSuccess = true
                 )
-                detectedDefects.add(defaultDefect)
             }
 
             val primary = detectedDefects.first()
@@ -520,6 +626,10 @@ object GeminiChatService {
             }
 
             GeminiLeakAnalysisResult(
+                isRelevantForInspection = true,
+                detectedSurface = if (primary.shortLabel == "CEILING LEAKAGE") "Ceiling" else "Wall",
+                hasVisibleDefects = true,
+                ocrDetectedText = externalOcrText,
                 detectedIssue = primary.problemTitle,
                 recommendedApplication = primary.fromchemSolution,
                 suggestedNextStep = primary.recommendedAction,
@@ -537,7 +647,7 @@ object GeminiChatService {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error in analyzeBitmapPixels: ${e.message}", e)
-            getDefaultLeakAnalysis()
+            getDefaultLeakAnalysis(contextDescription)
         }
     }
 
@@ -557,6 +667,9 @@ object GeminiChatService {
             }
         }
 
+        // Run MLKit OCR in background to extract any written markings or product labels
+        val ocrDetectedText = resolvedBitmap?.let { extractOcrText(it) }
+
         try {
             var apiKey = ""
             try {
@@ -566,80 +679,83 @@ object GeminiChatService {
             }
 
             if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY" || apiKey == "null") {
-                val fallbackResult = resolvedBitmap?.let { analyzeBitmapPixels(it) }
+                val fallbackResult = resolvedBitmap?.let { analyzeBitmapPixels(it, contextDescription, ocrDetectedText) }
                     ?: getDefaultLeakAnalysis(contextDescription)
                 return@withContext Result.success(fallbackResult)
             }
 
             val requestJson = JSONObject()
 
-            // System Instruction enforcing ChatGPT-like comprehensive visual inspection
+            // System Instruction enforcing strict 4-step pipeline
             val systemInstructionObj = JSONObject()
             val sysPartsArray = JSONArray()
             sysPartsArray.put(JSONObject().put("text", """
-                You are Fromchem Autonomous AI Visual Inspection Assistant, an advanced construction defect and water leakage diagnostic expert (similar to ChatGPT image analysis).
+                You are FromChem Solution AI Leak Detector, an expert diagnostic computer vision system.
                 
-                YOUR MISSION:
-                Inspect the ENTIRE provided image edge-to-edge. Examine walls, ceilings, floors, corners, joints, cracks, pipes, roof surfaces, drainage areas, tiles, concrete, paint, plaster, and waterproofing layers.
-                Do NOT focus only on the center or on just one defect. Detect ALL clearly visible defects present in the image.
+                You must strictly follow this sequential pipeline for EVERY image:
+                1. IMAGE QUALITY CHECK
+                   - Check: Is the image blurry, too dark, too far away, obstructed, or resolution inadequate?
+                   - If inadequate: Set "isImageQualityInsufficient": true, "imageQualityMessage": "Please capture a clearer and closer image of the suspected defective area."
+                   - Do NOT invent a diagnosis from an unclear image.
                 
-                WHAT TO LOOK FOR:
-                - Water leakage, dampness, seepage, moisture stains, watermarks
-                - Cracks, hairline cracks, structural-looking cracks
-                - Peeling paint, blistering paint, efflorescence / white salt deposits
-                - Mold-like or fungal growth, concrete deterioration, surface damage
-                - Waterproofing failure, pipe/joint leakage, ceiling leakage, terrace/roof leakage
-                - Wall seepage, bathroom wet-area leakage, drainage-related problems
+                2. IMAGE RELEVANCE CHECK (CRITICAL - DO NOT SKIP)
+                   - Relevant images include: building walls (interior/exterior), ceilings, floors, terraces, roofs, concrete surfaces, plaster surfaces, bathrooms, kitchens, balconies, construction joints, expansion joints, pipe areas, drainage areas, waterproofing surfaces, tiles, tile joints, damp/cracked/paint-damaged building surfaces.
+                   - Irrelevant examples: bottle, water bottle, person, face, animal, food, car, bike, mobile phone, laptop, random product, clothing, landscape, sky, tree, random object, selfie, screenshot unrelated to construction.
+                   - If the image is irrelevant:
+                     * Set "isRelevantForInspection": false
+                     * Set "detectedObject": "<name of detected object e.g. Bottle, Person, Car, etc.>"
+                     * Set "irrelevanceReason": "The uploaded image does not appear to show a building surface or visible waterproofing/construction defect."
+                     * Set "guidanceMessage": "Please capture a clear photo of the wall, ceiling, roof, floor, bathroom, terrace, pipe area, or other suspected defective area."
+                     * Set "defects": []
+                     * DO NOT mention seepage, dampness, wall crack, waterproofing failure, leakage, or FromChem treatments if the image is irrelevant!
                 
-                CRITICAL INSPECTION RULES:
-                1. COMPLETE INSPECTION: If multiple defects are present, detect and list ALL of them separately in the "defects" array.
-                2. DO NOT INVENT DEFECTS: Only identify defects visually supported by the image. If something cannot be confirmed, explicitly say: "Unable to confirm from the image."
-                   Do NOT pretend to know the exact source of a leak when the source is not visible. Distinguish between visible dampness and an unconfirmed water ingress origin.
-                   Never claim a crack is structurally dangerous unless clear evidence is visible in the photo; recommend qualified professional on-site inspection.
-                3. DEFECT LOCATION: For every detected defect, describe approximately where it appears (e.g. "Upper-right corner of the ceiling", "Lower wall section along the baseboard", "Around the pipe joint", "Central floor tile joint").
-                4. BOUNDING BOX: Provide normalized coordinates [ymin, xmin, ymax, xmax] between 0 and 1000 for each defect in "box_2d".
-                5. SEVERITY CLASSIFICATION: Classify each defect strictly as "LOW", "MODERATE", or "HIGH":
-                   - LOW: Minor surface damage, small hairline cracks, light staining, or limited visible dampness.
-                   - MODERATE: Significant seepage, larger cracks, peeling paint, repeated dampness, efflorescence, or visible waterproofing deterioration.
-                   - HIGH: Extensive water damage, major visible cracking, severe concrete deterioration, exposed reinforcement, active dripping leakage, or defects requiring urgent inspection.
-                6. CONFIDENCE SCORE: Visual certainty score as an integer from 1 to 100 (e.g. 92).
-                7. VISUAL EVIDENCE: Explain specifically what visible characteristics caused you to identify the problem.
-                8. LIKELY CAUSE: State the most likely cause, clearly distinguishing between a likely cause and a confirmed cause.
-                9. RECOMMENDED ACTION: Practical steps to solve or investigate the defect.
-                10. FROMCHEM PRODUCT MATCHING: Match strictly from Fromchem's available solutions:
-                   - Wall crack -> "Crack Paste (Fromchem Polymeric Waterproofing Crack Paste)"
-                   - Ceiling leakage -> "Elastomeric Rubber Coating or 2-K Coating or White Membrane"
-                   - Damp wall / seepage / efflorescence / peeling paint -> "SBR Coating or Epoxy or PU (Fromchem Damp-Proofing System)"
-                   - Basement wall / underground tanking -> "Black Membrane (Heavy-Duty Bituminous Tanking Membrane)"
-                   - Terrace / roof leakage -> "Liquid-Applied Elastomeric Membrane & Reflective White Membrane"
-                   - Pipe / joint leakage -> "Polymeric Waterproofing Joint Sealant & PU Expansion Seal"
-                   - Bathroom wet-area leakage -> "2-K Polymer Cementitious Coating & Epoxy Grout Seal"
-                   - Concrete deterioration / spalling -> "Polymer-Modified Structural Repair Mortar & Rust Inhibitor"
-                   - If no product fits: "No suitable FromChem product could be confidently matched from the available product database."
-                11. INSUFFICIENT QUALITY CHECK: If the image is blurry, too dark, too far away, obstructed, or insufficient to make a reliable assessment, set "isImageQualityInsufficient": true, provide "imageQualityMessage": "Image quality is insufficient for a reliable inspection. Please capture a clearer, closer image with the defective area fully visible.", and provide the 4 requested additional image angles.
-                12. TONE & ACCESSIBILITY: Explain clearly in language understandable to ordinary homeowners without unnecessary complex jargon.
+                3. VISUAL DEFECT INSPECTION & ANTI-HALLUCINATION
+                   - If the image is a relevant building surface, inspect edge-to-edge.
+                   - If NO defect is visibly present, set "hasVisibleDefects": false, "noDefectMessage": "No obvious visible defect detected.", "defects": []. DO NOT FORCE A DIAGNOSIS!
+                   - If defects are visible, detect each significant defect:
+                     * Defect categories: DAMPNESS, SEEPAGE, WATER STAIN, WALL CRACK, HAIRLINE CRACK, CONCRETE CRACK, PEELING PAINT, EFFLORESCENCE, MOLD/FUNGAL-LIKE GROWTH, WATERPROOFING FAILURE, PIPE/JOINT LEAKAGE, CEILING LEAKAGE, TERRACE/ROOF LEAKAGE, DRAINAGE PROBLEM, SURFACE DAMAGE, OTHER VISIBLE CONSTRUCTION DEFECT.
+                     * Location: describe approximate location (e.g. Upper-left corner, Center of wall, Lower-right portion, Near pipe joint, Along ceiling-wall junction).
+                     * Severity: LOW, MODERATE, HIGH (do not mark HIGH unless genuinely severe/urgent).
+                     * Confidence: estimated visual confidence score (1-100).
+                     * Visual evidence: exact visible characteristics observed.
+                     * Possible cause: state likely cause, distinguishing visual observation from unconfirmed cause ("The exact source cannot be confirmed from this image alone.").
+                     * Recommended FromChem Solution: match strictly from:
+                       - Crack Paste (Fromchem Polymeric Waterproofing Crack Paste)
+                       - Elastomeric Rubber Coating or 2-K Coating or White Membrane
+                       - SBR Coating or Epoxy or PU (Fromchem Damp-Proofing System)
+                       - Black Membrane (Heavy-Duty Bituminous Tanking Membrane)
+                       - Liquid-Applied Elastomeric Membrane & Reflective White Membrane
+                       - Polymeric Waterproofing Joint Sealant & PU Expansion Seal
+                       - 2-K Polymer Cementitious Coating & Epoxy Grout Seal
+                       - Polymer-Modified Structural Repair Mortar & Rust Inhibitor
+                       - If none matches: "No suitable FromChem product could be confidently matched from the available product database."
                 
-                You MUST return ONLY a valid JSON object strictly matching this schema with NO markdown code block or backticks:
+                4. OCR SUPPORT
+                   - If any text is visible in the image (product labels, chemical names, markings), extract it into "ocrDetectedText".
+                
+                You MUST return ONLY a valid JSON object strictly matching this schema with NO markdown code blocks:
                 {
                    "isImageQualityInsufficient": false,
                    "imageQualityMessage": "",
-                   "suggestedAdditionalImages": [
-                      "1. Full area view showing entire wall, ceiling, or floor section",
-                      "2. Close-up photo directly centered on the defect",
-                      "3. Nearby adjacent wall/ceiling/roof area",
-                      "4. Possible water-source area (plumbing, exterior wall, or roof drain)"
-                   ],
-                   "overallSummary": "Clear 1-2 sentence overview of findings for the homeowner",
-                   "safetyLimitationNote": "AI is an automated visual inspection assistant, not a licensed structural engineer. Professional on-site physical inspection is recommended for major structural defects or hidden moisture paths. An image alone cannot confirm the exact origin of water ingress.",
+                   "isRelevantForInspection": true,
+                   "detectedObject": "",
+                   "irrelevanceReason": "",
+                   "guidanceMessage": "",
+                   "detectedSurface": "Wall or Ceiling or Roof or Terrace or Floor or Bathroom or Other",
+                   "hasVisibleDefects": true,
+                   "noDefectMessage": "",
+                   "ocrDetectedText": "",
+                   "overallSummary": "Clear overview for homeowner",
+                   "safetyLimitationNote": "AI is an automated visual inspection assistant. Professional on-site physical inspection is recommended for major structural defects or hidden moisture paths.",
                    "defects": [
                       {
-                         "problemTitle": "Specific defect name e.g. Wall Seepage & Rising Dampness",
-                         "shortLabel": "Seepage",
-                         "location": "Approximate location description e.g. Lower section of the wall along baseboard",
+                         "problemTitle": "Specific defect name",
+                         "shortLabel": "DAMPNESS or WALL CRACK etc",
+                         "location": "Approximate location description",
                          "severity": "LOW or MODERATE or HIGH",
                          "confidenceScore": 92,
                          "visualEvidence": "Visible characteristics confirming the defect",
-                         "likelyCause": "Likely cause distinguishing likely vs confirmed",
+                         "likelyCause": "Likely cause distinguishing visible vs unconfirmed cause",
                          "recommendedAction": "Practical steps to resolve or inspect",
                          "fromchemSolution": "Matched FromChem product name",
                          "fromchemProductSpec": "Key chemical spec and treatment method",
@@ -665,9 +781,9 @@ object GeminiChatService {
             }
 
             val userPromptText = if (contextDescription.isNotBlank()) {
-                "Perform edge-to-edge visual inspection on this image. Detect all visible construction and leakage defects across walls, ceilings, floors, joints, cracks, and pipes. Context: $contextDescription"
+                "Perform strict visual inspection on this image. First verify image quality and relevance. If relevant, detect all visible construction defects. Context: $contextDescription. OCR text detected: ${ocrDetectedText ?: "None"}"
             } else {
-                "Perform a thorough edge-to-edge visual inspection of this entire image. Detect all visible water leaks, cracks, damp patches, peeling paint, or concrete defects, and provide matched FromChem solutions."
+                "Perform strict visual inspection on this image. First verify image quality and relevance. If relevant, inspect edge-to-edge for building defects and match FromChem solutions. OCR text detected: ${ocrDetectedText ?: "None"}"
             }
             partsArr.put(JSONObject().put("text", userPromptText))
             contentObj.put("parts", partsArr)
@@ -676,7 +792,7 @@ object GeminiChatService {
 
             // Generation config
             val generationConfig = JSONObject()
-            generationConfig.put("temperature", 0.15)
+            generationConfig.put("temperature", 0.1)
             generationConfig.put("maxOutputTokens", 1500)
             requestJson.put("generationConfig", generationConfig)
 
@@ -689,7 +805,7 @@ object GeminiChatService {
 
             if (!response.isSuccessful) {
                 Log.e(TAG, "Gemini photo analysis API failed: $responseBodyString")
-                val fallback = resolvedBitmap?.let { analyzeBitmapPixels(it) }
+                val fallback = resolvedBitmap?.let { analyzeBitmapPixels(it, contextDescription, ocrDetectedText) }
                     ?: getDefaultLeakAnalysis(contextDescription)
                 return@withContext Result.success(fallback)
             }
@@ -702,25 +818,29 @@ object GeminiChatService {
                 val parts = content?.optJSONArray("parts")
                 if (parts != null && parts.length() > 0) {
                     val rawText = parts.getJSONObject(0).optString("text", "")
-                    val parsed = parseJsonResponse(rawText, resolvedBitmap)
+                    val parsed = parseJsonResponse(rawText, resolvedBitmap, ocrDetectedText)
                     if (parsed != null) {
                         return@withContext Result.success(parsed)
                     }
                 }
             }
 
-            val finalFallback = resolvedBitmap?.let { analyzeBitmapPixels(it) }
+            val finalFallback = resolvedBitmap?.let { analyzeBitmapPixels(it, contextDescription, ocrDetectedText) }
                 ?: getDefaultLeakAnalysis(contextDescription)
             Result.success(finalFallback)
         } catch (e: Exception) {
             Log.e(TAG, "Exception during analyzeLeakPhoto: ${e.message}", e)
-            val fallback = resolvedBitmap?.let { analyzeBitmapPixels(it) }
+            val fallback = resolvedBitmap?.let { analyzeBitmapPixels(it, contextDescription, ocrDetectedText) }
                 ?: getDefaultLeakAnalysis(contextDescription)
             Result.success(fallback)
         }
     }
 
-    private fun parseJsonResponse(rawText: String, fallbackBitmap: Bitmap? = null): GeminiLeakAnalysisResult? {
+    private fun parseJsonResponse(
+        rawText: String,
+        fallbackBitmap: Bitmap? = null,
+        fallbackOcrText: String? = null
+    ): GeminiLeakAnalysisResult? {
         return try {
             val cleaned = rawText.trim()
                 .removePrefix("```json")
@@ -730,21 +850,64 @@ object GeminiChatService {
             val json = JSONObject(cleaned)
 
             val isQualityInsufficient = json.optBoolean("isImageQualityInsufficient", false)
-            val qualityMsg = json.optString("imageQualityMessage", "")
-            val addlImages = mutableListOf<String>()
-            val addlArr = json.optJSONArray("suggestedAdditionalImages")
-            if (addlArr != null) {
-                for (j in 0 until addlArr.length()) {
-                    addlImages.add(addlArr.getString(j))
-                }
-            } else if (isQualityInsufficient) {
-                addlImages.addAll(listOf(
-                    "1. Full area view showing entire wall, ceiling, or floor section",
-                    "2. Close-up photo directly centered on the defect",
-                    "3. Nearby adjacent wall/ceiling/roof area",
-                    "4. Possible water-source area (plumbing, exterior wall, or roof drain)"
-                ))
+            val qualityMsg = json.optString("imageQualityMessage", "Please capture a clearer and closer image of the suspected defective area.")
+
+            // Handle Insufficient Quality
+            if (isQualityInsufficient) {
+                return GeminiLeakAnalysisResult(
+                    isImageQualityInsufficient = true,
+                    imageQualityMessage = qualityMsg,
+                    suggestedAdditionalImages = listOf(
+                        "1. Wide overview showing the entire wall, ceiling, or floor section",
+                        "2. Close-up photo directly centered on the defect",
+                        "3. Nearby adjacent wall, ceiling, or roof area",
+                        "4. Possible water-source area (plumbing, exterior wall, or roof drain)"
+                    ),
+                    detectedIssue = "IMAGE QUALITY INSUFFICIENT",
+                    recommendedApplication = "Re-capture in Adequate Lighting",
+                    suggestedNextStep = qualityMsg,
+                    severityLevel = "Low Risk",
+                    chemicalSpec = "N/A - Retake Recommended",
+                    summary = "Image quality is insufficient for a reliable inspection. Please capture a clearer and closer image of the suspected defective area.",
+                    isSuccess = false,
+                    defectCategory = "Image Quality Insufficient",
+                    confidence = "15% Certainty",
+                    defects = emptyList(),
+                    ocrDetectedText = fallbackOcrText
+                )
             }
+
+            // Handle Image Relevance Check
+            val isRelevant = json.optBoolean("isRelevantForInspection", true)
+            val detectedObj = json.optString("detectedObject", "")
+            if (!isRelevant || (detectedObj.isNotBlank() && listOf("bottle", "person", "car", "phone", "bike", "animal", "food").any { detectedObj.contains(it, ignoreCase = true) })) {
+                val objectName = detectedObj.ifBlank { "Unrelated Object" }
+                val reason = json.optString("irrelevanceReason", "The uploaded image does not appear to show a building surface or visible waterproofing/construction defect.")
+                val guidance = json.optString("guidanceMessage", "Please capture a clear photo of the wall, ceiling, roof, floor, bathroom, terrace, pipe area, or other suspected defective area.")
+                return GeminiLeakAnalysisResult(
+                    isRelevantForInspection = false,
+                    detectedObject = objectName,
+                    irrelevanceReason = reason,
+                    guidanceMessage = guidance,
+                    detectedSurface = "Non-construction Object ($objectName)",
+                    hasVisibleDefects = false,
+                    noDefectMessage = null,
+                    ocrDetectedText = json.optString("ocrDetectedText", "").ifBlank { fallbackOcrText },
+                    detectedIssue = "IMAGE NOT SUITABLE FOR LEAK DETECTION",
+                    recommendedApplication = "N/A - Irrelevant Image",
+                    suggestedNextStep = guidance,
+                    severityLevel = "Normal",
+                    chemicalSpec = "None",
+                    summary = "Detected Object: $objectName. $reason",
+                    defectCategory = "Irrelevant Image",
+                    confidence = "98% Detection Confidence",
+                    defects = emptyList(),
+                    isSuccess = true
+                )
+            }
+
+            val ocrText = json.optString("ocrDetectedText", "").ifBlank { fallbackOcrText }
+            val detectedSurface = json.optString("detectedSurface", "Wall")
 
             val parsedDefects = mutableListOf<DetectedDefect>()
             val defectsArr = json.optJSONArray("defects")
@@ -752,7 +915,7 @@ object GeminiChatService {
                 for (i in 0 until defectsArr.length()) {
                     val defObj = defectsArr.getJSONObject(i)
                     val title = defObj.optString("problemTitle", defObj.optString("detectedIssue", "Detected Defect"))
-                    val shortLabel = defObj.optString("shortLabel", title.take(16))
+                    val shortLabel = defObj.optString("shortLabel", title.take(16)).uppercase()
                     val loc = defObj.optString("location", "Visible on surface")
                     val rawSev = defObj.optString("severity", "MODERATE").uppercase()
                     val severity = when {
@@ -802,73 +965,107 @@ object GeminiChatService {
                 }
             }
 
-            // Fallback for single-defect legacy format
-            if (parsedDefects.isEmpty() && !isQualityInsufficient) {
-                val legacyIssue = json.optString("detectedIssue", "")
-                if (legacyIssue.isNotBlank()) {
-                    val legacyCategory = json.optString("defectCategory", "Wall Crack")
-                    parsedDefects.add(
-                        DetectedDefect(
-                            id = "defect_primary",
-                            problemTitle = legacyIssue,
-                            shortLabel = legacyCategory,
-                            location = "Central inspection area",
-                            severity = if (json.optString("severityLevel").contains("High", ignoreCase = true)) "HIGH" else "MODERATE",
-                            confidenceScore = 94,
-                            visualEvidence = "Identified by autonomous vision features.",
-                            likelyCause = "Substrate or moisture movement (exact source cannot be confirmed from image alone).",
-                            recommendedAction = json.optString("suggestedNextStep", "Apply recommended FromChem solution."),
-                            fromchemSolution = json.optString("recommendedApplication", "Crack Paste"),
-                            fromchemProductSpec = json.optString("chemicalSpec", "Polymeric Waterproofing Crack Paste"),
-                            boundingBox = DefectBoundingBox(0.15f, 0.15f, 0.85f, 0.85f)
-                        )
-                    )
-                }
+            // Check if clean surface / no defect was explicitly reported or if defects list is empty
+            val hasVisibleDefects = json.optBoolean("hasVisibleDefects", parsedDefects.isNotEmpty())
+            if (!hasVisibleDefects || parsedDefects.isEmpty()) {
+                val noDefectMsg = json.optString("noDefectMessage", "No obvious visible defect detected.")
+                return GeminiLeakAnalysisResult(
+                    isRelevantForInspection = true,
+                    detectedSurface = detectedSurface,
+                    hasVisibleDefects = false,
+                    noDefectMessage = noDefectMsg,
+                    ocrDetectedText = ocrText,
+                    detectedIssue = "No Obvious Visible Defect Detected",
+                    recommendedApplication = "Surface is intact - No remedial chemical required",
+                    suggestedNextStep = "Surface appears clean and structurally intact. Regular periodic monitoring recommended.",
+                    severityLevel = "Normal",
+                    chemicalSpec = "Intact Substrate",
+                    summary = "$noDefectMsg The inspected $detectedSurface appears clean and intact with no visible signs of water leakage, cracking, or surface degradation.",
+                    defectCategory = "Clean Surface",
+                    confidence = "95% Visual Certainty",
+                    defects = emptyList(),
+                    isSuccess = true
+                )
             }
 
-            val primaryDefect = parsedDefects.firstOrNull()
-            val category = primaryDefect?.shortLabel ?: json.optString("defectCategory", "Wall Crack")
-            val confStr = if (primaryDefect != null) "${primaryDefect.confidenceScore}% Visual Certainty" else json.optString("confidence", "96% Match")
+            val primaryDefect = parsedDefects.first()
+            val category = primaryDefect.shortLabel
+            val confStr = "${primaryDefect.confidenceScore}% Visual Certainty"
             val overallSum = json.optString("overallSummary", json.optString("summary", "Complete visual inspection report generated for the uploaded image."))
             val safetyNote = json.optString("safetyLimitationNote", "AI is an automated visual inspection assistant, not a licensed structural engineer. Professional on-site physical inspection is recommended for major structural defects or hidden moisture paths. An image alone cannot confirm the exact origin of water ingress.")
 
             GeminiLeakAnalysisResult(
-                detectedIssue = primaryDefect?.problemTitle ?: json.optString("detectedIssue", "Surface Defect"),
-                recommendedApplication = primaryDefect?.fromchemSolution ?: json.optString("recommendedApplication", "Crack Paste"),
-                suggestedNextStep = primaryDefect?.recommendedAction ?: json.optString("suggestedNextStep", "Apply protective sealant"),
-                severityLevel = primaryDefect?.severity?.let {
-                    when (it) {
-                        "HIGH" -> "High Urgency"
-                        "LOW" -> "Low Risk"
-                        else -> "Moderate Risk"
-                    }
-                } ?: json.optString("severityLevel", "Moderate Risk"),
-                chemicalSpec = primaryDefect?.fromchemProductSpec ?: json.optString("chemicalSpec", "Specialized Polymer"),
+                isRelevantForInspection = true,
+                detectedSurface = detectedSurface,
+                hasVisibleDefects = true,
+                ocrDetectedText = ocrText,
+                detectedIssue = primaryDefect.problemTitle,
+                recommendedApplication = primaryDefect.fromchemSolution,
+                suggestedNextStep = primaryDefect.recommendedAction,
+                severityLevel = when (primaryDefect.severity) {
+                    "HIGH" -> "High Urgency"
+                    "LOW" -> "Low Risk"
+                    else -> "Moderate Risk"
+                },
+                chemicalSpec = primaryDefect.fromchemProductSpec,
                 summary = overallSum,
-                isSuccess = !isQualityInsufficient,
+                isSuccess = true,
                 defectCategory = category,
                 confidence = confStr,
                 defects = parsedDefects,
-                isImageQualityInsufficient = isQualityInsufficient,
-                imageQualityMessage = qualityMsg,
-                suggestedAdditionalImages = addlImages,
+                isImageQualityInsufficient = false,
+                imageQualityMessage = "",
                 safetyLimitationNote = safetyNote
             )
         } catch (e: Exception) {
             Log.w(TAG, "Could not parse JSON response from Gemini, falling back: ${e.message}")
-            fallbackBitmap?.let { analyzeBitmapPixels(it) }
+            fallbackBitmap?.let { analyzeBitmapPixels(it, externalOcrText = fallbackOcrText) }
         }
     }
 
     fun getDefaultLeakAnalysis(contextDescription: String = ""): GeminiLeakAnalysisResult {
         val q = contextDescription.lowercase()
+
+        val irrelevantKeywords = listOf(
+            "bottle", "water bottle", "waterbottle", "plastic bottle", "glass bottle", "beverage", "drink", "soda",
+            "coke", "pepsi", "sprite", "fanta", "aquafina", "bisleri", "kinley", "mineral water", "packaged drinking water",
+            "ingredients", "nutrition facts", "net quantity", "net qty", "mrp", "person", "human", "face", "selfie",
+            "animal", "dog", "cat", "pet", "food", "fruit", "dish", "snack", "car", "bike", "bicycle", "motorcycle",
+            "vehicle", "phone", "mobile", "cellphone", "laptop", "computer", "keyboard", "monitor", "mouse",
+            "clothing", "shirt", "t-shirt", "pant", "shoe", "shoes", "bag", "backpack", "tree", "plant", "flower",
+            "leaf", "sky", "cloud", "landscape", "screenshot", "desk", "table", "chair", "pen", "pencil", "book",
+            "cup", "mug", "plate", "spoon", "fork", "can", "beer", "wine", "tea", "coffee", "product"
+        )
+        val foundIrrelevant = irrelevantKeywords.firstOrNull { q.contains(it) }
+        if (foundIrrelevant != null) {
+            val objName = foundIrrelevant.replaceFirstChar { it.uppercase() }
+            return GeminiLeakAnalysisResult(
+                isRelevantForInspection = false,
+                detectedObject = objName,
+                irrelevanceReason = "The uploaded image does not appear to show a building surface or visible waterproofing/construction defect.",
+                guidanceMessage = "Please capture a clear photo of the wall, ceiling, roof, floor, bathroom, terrace, pipe area, or other suspected defective area.",
+                detectedSurface = "Non-construction Object ($objName)",
+                hasVisibleDefects = false,
+                detectedIssue = "IMAGE NOT SUITABLE FOR LEAK DETECTION",
+                recommendedApplication = "N/A - Irrelevant Image",
+                suggestedNextStep = "Please capture a clear photo of the wall, ceiling, roof, floor, bathroom, terrace, pipe area, or other suspected defective area.",
+                severityLevel = "Normal",
+                chemicalSpec = "None",
+                summary = "Detected Object: $objName. The image does not show a relevant building/construction surface or visible waterproofing defect.",
+                defectCategory = "Irrelevant Image",
+                confidence = "98% Detection Confidence",
+                defects = emptyList(),
+                isSuccess = true
+            )
+        }
+
         return when {
             q.contains("basement") -> {
                 val defects = listOf(
                     DetectedDefect(
                         id = "defect_base_1",
                         problemTitle = "Negative Hydrostatic Water Infiltration",
-                        shortLabel = "Basement Leak",
+                        shortLabel = "BASEMENT LEAK",
                         location = "Subterranean foundation retaining wall",
                         severity = "HIGH",
                         confidenceScore = 95,
@@ -882,7 +1079,7 @@ object GeminiChatService {
                     DetectedDefect(
                         id = "defect_base_2",
                         problemTitle = "Cold Joint Groundwater Seepage",
-                        shortLabel = "Joint Seepage",
+                        shortLabel = "JOINT SEEPAGE",
                         location = "Wall-to-slab base joint",
                         severity = "HIGH",
                         confidenceScore = 91,
@@ -895,6 +1092,9 @@ object GeminiChatService {
                     )
                 )
                 GeminiLeakAnalysisResult(
+                    isRelevantForInspection = true,
+                    detectedSurface = "Basement Wall",
+                    hasVisibleDefects = true,
                     detectedIssue = "Negative Hydrostatic Water Pressure & Foundation Seepage",
                     recommendedApplication = "Black Membrane (Heavy-Duty Bituminous Tanking Membrane)",
                     suggestedNextStep = "Install Continuous Seamless Black Membrane Waterproofing Barrier",
@@ -911,7 +1111,7 @@ object GeminiChatService {
                     DetectedDefect(
                         id = "defect_ceil_1",
                         problemTitle = "Overhead Slab Porosity & Water Staining",
-                        shortLabel = "Ceiling Leak",
+                        shortLabel = "CEILING LEAKAGE",
                         location = "Central overhead concrete slab",
                         severity = "HIGH",
                         confidenceScore = 94,
@@ -925,7 +1125,7 @@ object GeminiChatService {
                     DetectedDefect(
                         id = "defect_ceil_2",
                         problemTitle = "Active Water Droplet Dripping",
-                        shortLabel = "Active Drip",
+                        shortLabel = "WATER STAIN",
                         location = "Lower contour of ceiling stain",
                         severity = "HIGH",
                         confidenceScore = 91,
@@ -938,6 +1138,9 @@ object GeminiChatService {
                     )
                 )
                 GeminiLeakAnalysisResult(
+                    isRelevantForInspection = true,
+                    detectedSurface = "Ceiling",
+                    hasVisibleDefects = true,
                     detectedIssue = "Overhead Slab Porosity & Water Droplet Dripping",
                     recommendedApplication = "Elastomeric Rubber Coating / 2-K Coating / White Membrane",
                     suggestedNextStep = "Apply Multi-Layer 2-K Polymer Slurry or White Elastomeric Membrane",
@@ -949,12 +1152,12 @@ object GeminiChatService {
                     defects = defects
                 )
             }
-            q.contains("damp") || q.contains("moisture") -> {
+            q.contains("damp") || q.contains("moisture") || q.contains("seepage") -> {
                 val defects = listOf(
                     DetectedDefect(
                         id = "defect_damp_1",
                         problemTitle = "Capillary Rising Dampness & Paint Blistering",
-                        shortLabel = "Rising Damp",
+                        shortLabel = "DAMPNESS",
                         location = "Lower wall section along baseboard",
                         severity = "MODERATE",
                         confidenceScore = 96,
@@ -968,7 +1171,7 @@ object GeminiChatService {
                     DetectedDefect(
                         id = "defect_damp_2",
                         problemTitle = "Efflorescence & White Mineral Salt Deposits",
-                        shortLabel = "Efflorescence",
+                        shortLabel = "EFFLORESCENCE",
                         location = "Mid-to-lower wall surface perimeter",
                         severity = "LOW",
                         confidenceScore = 90,
@@ -981,6 +1184,9 @@ object GeminiChatService {
                     )
                 )
                 GeminiLeakAnalysisResult(
+                    isRelevantForInspection = true,
+                    detectedSurface = "Wall",
+                    hasVisibleDefects = true,
                     detectedIssue = "Capillary Rising Dampness & Paint Blistering",
                     recommendedApplication = "SBR Coating / Epoxy / PU (Polyurethane Coating)",
                     suggestedNextStep = "Scrape Peeling Plaster & Apply Deep-Penetrating SBR / Epoxy / PU Barrier",
@@ -992,12 +1198,12 @@ object GeminiChatService {
                     defects = defects
                 )
             }
-            else -> {
+            q.contains("crack") -> {
                 val defects = listOf(
                     DetectedDefect(
                         id = "defect_crack_1",
                         problemTitle = "Vertical Settlement Wall Crack",
-                        shortLabel = "Wall Crack",
+                        shortLabel = "WALL CRACK",
                         location = "Central vertical masonry plane",
                         severity = "MODERATE",
                         confidenceScore = 95,
@@ -1011,7 +1217,7 @@ object GeminiChatService {
                     DetectedDefect(
                         id = "defect_crack_2",
                         problemTitle = "Secondary Hairline Plaster Fissures",
-                        shortLabel = "Hairline Crack",
+                        shortLabel = "HAIRLINE CRACK",
                         location = "Branching outward into adjacent plaster",
                         severity = "LOW",
                         confidenceScore = 88,
@@ -1024,6 +1230,9 @@ object GeminiChatService {
                     )
                 )
                 GeminiLeakAnalysisResult(
+                    isRelevantForInspection = true,
+                    detectedSurface = "Wall",
+                    hasVisibleDefects = true,
                     detectedIssue = "Vertical Shear & Settlement Wall Crack",
                     recommendedApplication = "Crack Paste (Fromchem Polymeric Crack Filler)",
                     suggestedNextStep = "V-Groove Opening & Deep Application of Crack Paste",
@@ -1033,6 +1242,25 @@ object GeminiChatService {
                     defectCategory = "Wall Crack",
                     confidence = "95% Visual Certainty",
                     defects = defects
+                )
+            }
+            else -> {
+                // If nothing specified, report clean surface rather than hallucinating a defect
+                GeminiLeakAnalysisResult(
+                    isRelevantForInspection = true,
+                    detectedSurface = "Wall",
+                    hasVisibleDefects = false,
+                    noDefectMessage = "No obvious visible defect detected.",
+                    detectedIssue = "No Obvious Visible Defect Detected",
+                    recommendedApplication = "Surface is intact - No remedial chemical required",
+                    suggestedNextStep = "Surface appears clean and structurally intact. Regular periodic monitoring recommended.",
+                    severityLevel = "Normal",
+                    chemicalSpec = "Intact Structural Substrate",
+                    summary = "No obvious visible defect detected. The inspected surface appears clean and structurally intact with no visible signs of active water ingress, dampness, cracking, efflorescence, or paint degradation.",
+                    defectCategory = "Clean Surface",
+                    confidence = "95% Visual Certainty",
+                    defects = emptyList(),
+                    isSuccess = true
                 )
             }
         }

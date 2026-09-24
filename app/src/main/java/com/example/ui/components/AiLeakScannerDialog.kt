@@ -317,10 +317,9 @@ fun AiLeakScannerDialog(
             }
 
             // 2. Google Gemini AI & Autonomous Computer Vision Analysis Flow
-            analysisStatusText = "Autonomous AI scanning image pixels for crack, moisture or leakage..."
+            analysisStatusText = "Autonomous AI checking image quality, relevance and defects..."
             analysisProgress = 0.60f
-            val contextDesc = preset?.let { "${it.name} - ${it.category}: ${it.description}" }
-                ?: "Building leak / concrete moisture defect inspection"
+            val contextDesc = preset?.let { "${it.name} - ${it.category}: ${it.description}" } ?: ""
 
             val geminiAnalysisRes = GeminiChatService.analyzeLeakPhoto(
                 imageBytes = imageBytes,
@@ -329,7 +328,7 @@ fun AiLeakScannerDialog(
             )
 
             val geminiResult = geminiAnalysisRes.getOrDefault(
-                bitmap?.let { GeminiChatService.analyzeBitmapPixels(it) }
+                bitmap?.let { GeminiChatService.analyzeBitmapPixels(it, contextDescription = contextDesc) }
                     ?: preset?.let {
                         GeminiLeakAnalysisResult(
                             detectedIssue = it.detectedIssue,
@@ -603,26 +602,22 @@ fun AiLeakScannerDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Shared Inspection Result Resolution
+                val isPresetMode = capturedBitmap == null && selectedImageUri == null && selectedPreset != null && activeGeminiResult == null
                 val currentPreset = selectedPreset ?: sampleStructuralPresets[0]
-                val displayDefects = activeGeminiResult?.defects?.ifEmpty { null }
-                    ?: currentPreset.defects.ifEmpty {
-                        listOf(
-                            DetectedDefect(
-                                id = "defect_primary",
-                                problemTitle = activeGeminiResult?.detectedIssue ?: currentPreset.detectedIssue,
-                                shortLabel = activeGeminiResult?.defectCategory ?: currentPreset.name,
-                                location = "Central inspection area",
-                                severity = if (currentPreset.severityLevel.contains("High", true) || currentPreset.severityLevel.contains("Severe", true)) "HIGH" else "MODERATE",
-                                confidenceScore = 95,
-                                visualEvidence = activeGeminiResult?.summary ?: currentPreset.description,
-                                likelyCause = "Water migration through porous substrate or joint settlement.",
-                                recommendedAction = activeGeminiResult?.suggestedNextStep ?: currentPreset.suggestedNextStep,
-                                fromchemSolution = activeGeminiResult?.recommendedApplication ?: currentPreset.recommendedApplication,
-                                fromchemProductSpec = activeGeminiResult?.chemicalSpec ?: currentPreset.chemicalSpec,
-                                boundingBox = DefectBoundingBox(0.20f, 0.20f, 0.80f, 0.80f)
-                            )
-                        )
+                val displayDefects = if (activeGeminiResult != null) {
+                    if (!activeGeminiResult!!.isRelevantForInspection ||
+                        activeGeminiResult!!.isImageQualityInsufficient ||
+                        !activeGeminiResult!!.hasVisibleDefects
+                    ) {
+                        emptyList()
+                    } else {
+                        activeGeminiResult!!.defects
                     }
+                } else if (isPresetMode) {
+                    currentPreset.defects
+                } else {
+                    emptyList()
+                }
 
                 // Main Display Box
                 val infiniteScanTransition = rememberInfiniteTransition(label = "camera_hud_scan")
@@ -773,8 +768,12 @@ fun AiLeakScannerDialog(
                         }
 
                         // Autonomous Result Overlays on the Viewfinder
-                        if (!isAnalyzing && (activeGeminiResult != null || selectedPreset != null)) {
-                            // Top Banner: Edge-to-edge Multi-Defect Detection Count
+                        if (!isAnalyzing && (activeGeminiResult != null || isPresetMode)) {
+                            val isIrrelevant = activeGeminiResult?.isRelevantForInspection == false
+                            val isInsufficient = activeGeminiResult?.isImageQualityInsufficient == true
+                            val isClean = activeGeminiResult?.isRelevantForInspection == true && activeGeminiResult?.hasVisibleDefects == false
+
+                            // Top Banner: Status & Defect Detection Count
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
@@ -782,8 +781,16 @@ fun AiLeakScannerDialog(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
-                                    color = Color.Black.copy(alpha = 0.82f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.8f))
+                                    color = Color.Black.copy(alpha = 0.88f),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        when {
+                                            isIrrelevant -> Color(0xFFFF5252)
+                                            isInsufficient -> Color(0xFFFFB74D)
+                                            isClean -> Color(0xFF69F0AE)
+                                            else -> Color(0xFF00E5FF).copy(alpha = 0.8f)
+                                        }
+                                    )
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -791,32 +798,40 @@ fun AiLeakScannerDialog(
                                     ) {
                                         Surface(
                                             shape = CircleShape,
-                                            color = Color(0xFF00E5FF),
+                                            color = when {
+                                                isIrrelevant -> Color(0xFFFF5252)
+                                                isInsufficient -> Color(0xFFFFB74D)
+                                                isClean -> Color(0xFF69F0AE)
+                                                else -> Color(0xFF00E5FF)
+                                            },
                                             modifier = Modifier.size(7.dp)
                                         ) {}
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "EDGE-TO-EDGE SCAN: ${displayDefects.size} DEFECT${if (displayDefects.size > 1) "S" else ""} FOUND",
+                                            text = when {
+                                                isIrrelevant -> "IMAGE NOT SUITABLE FOR LEAK DETECTION"
+                                                isInsufficient -> "IMAGE QUALITY INSUFFICIENT"
+                                                isClean -> "NO OBVIOUS VISIBLE DEFECT DETECTED"
+                                                else -> "EDGE-TO-EDGE SCAN: ${displayDefects.size} DEFECT${if (displayDefects.size > 1) "S" else ""} FOUND"
+                                            },
                                             color = Color.White,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = activeGeminiResult?.confidence ?: "96% Certainty",
-                                            color = Color(0xFF69F0AE),
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
+                                        if (!isIrrelevant && !isInsufficient) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = activeGeminiResult?.confidence ?: "96% Certainty",
+                                                color = Color(0xFF69F0AE),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            // Bottom Pill: Recommended Primary Product
-                            val primarySolution = displayDefects.firstOrNull()?.fromchemSolution
-                                ?: activeGeminiResult?.recommendedApplication
-                                ?: currentPreset.recommendedApplication
-
+                            // Bottom Pill
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
@@ -825,21 +840,44 @@ fun AiLeakScannerDialog(
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
                                     color = Color(0xFF0A2540).copy(alpha = 0.92f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8))
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (isIrrelevant) Color(0xFFFF5252) else Color(0xFF38BDF8)
+                                    )
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.CheckCircle,
+                                            imageVector = when {
+                                                isIrrelevant -> Icons.Default.Block
+                                                isInsufficient -> Icons.Default.Warning
+                                                isClean -> Icons.Default.CheckCircle
+                                                else -> Icons.Default.CheckCircle
+                                            },
                                             contentDescription = null,
-                                            tint = Color(0xFF69F0AE),
+                                            tint = when {
+                                                isIrrelevant -> Color(0xFFFF5252)
+                                                isInsufficient -> Color(0xFFFFB74D)
+                                                else -> Color(0xFF69F0AE)
+                                            },
                                             modifier = Modifier.size(13.dp)
                                         )
                                         Spacer(modifier = Modifier.width(5.dp))
+                                        val bottomText = when {
+                                            isIrrelevant -> "Detected Object: ${activeGeminiResult?.detectedObject ?: "Unrelated Object"}"
+                                            isInsufficient -> "Please capture a clearer, closer image"
+                                            isClean -> "Clean Surface: ${activeGeminiResult?.detectedSurface ?: "Wall"} (Intact)"
+                                            else -> {
+                                                val primarySol = displayDefects.firstOrNull()?.fromchemSolution
+                                                    ?: activeGeminiResult?.recommendedApplication
+                                                    ?: currentPreset.recommendedApplication
+                                                "Solution: $primarySol"
+                                            }
+                                        }
                                         Text(
-                                            text = "Solution: $primarySolution",
+                                            text = bottomText,
                                             color = Color.White,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
@@ -919,50 +957,12 @@ fun AiLeakScannerDialog(
                         .fillMaxWidth()
                         .testTag("ai_diagnostic_result")
                 ) {
-                    // Result Header & Severity Tag
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Analytics,
-                                contentDescription = null,
-                                tint = FromchemPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "AI VISUAL INSPECTION REPORT",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = FromchemPrimary,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = severityColor.copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                text = currentSeverityLevel,
-                                color = severityColor,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-
                     // Firebase Sync Status indicator
                     if (firebaseSyncStatus != null) {
-                        Spacer(modifier = Modifier.height(6.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = if (firebaseDocId != null) Color(0xFFE8F5E9) else FromchemSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -985,95 +985,498 @@ fun AiLeakScannerDialog(
                         }
                     }
 
-                    // Quality Warning if image was insufficient
-                    if (activeGeminiResult?.isImageQualityInsufficient == true) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFFFF3E0),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB74D)),
-                            modifier = Modifier.fillMaxWidth()
+                    if (activeGeminiResult?.isRelevantForInspection == false) {
+                        // =========================================================================
+                        // STATE 1: INVALID / IRRELEVANT IMAGE (Section 14 of Specification)
+                        // Bottle, person, car, phone, food, etc.
+                        // DO NOT show leakage diagnosis, cracks, or FromChem treatments.
+                        // =========================================================================
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F2)),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFDA4AF)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("irrelevant_image_card")
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = Color(0xFFE65100),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Image Quality Insufficient for Reliable Inspection",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = Color(0xFFE65100)
-                                    )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFFE11D48),
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Block,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "IMAGE NOT SUITABLE FOR LEAK DETECTION",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF9F1239),
+                                            letterSpacing = 0.5.sp
+                                        )
+                                        Text(
+                                            text = "Relevance Validation Check Failed",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFFBE123C)
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (activeGeminiResult?.imageQualityMessage?.isNotBlank() == true) {
-                                        activeGeminiResult!!.imageQualityMessage
-                                    } else {
-                                        "Image quality is insufficient for a reliable inspection. Please capture a clearer, closer image with the defective area fully visible."
-                                    },
-                                    fontSize = 11.sp,
-                                    color = Color(0xFFBF360C)
-                                )
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
+                                HorizontalDivider(color = Color(0xFFFECDD3))
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Detected Object
                                 Text(
-                                    text = "Recommended Photos for Complete Assessment:",
+                                    text = "Detected Object:",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFE65100)
+                                    color = Color(0xFF881337)
                                 )
-                                val angleList = if (activeGeminiResult?.suggestedAdditionalImages?.isNotEmpty() == true) {
-                                    activeGeminiResult!!.suggestedAdditionalImages
-                                } else {
-                                    listOf(
-                                        "1. Wide overview showing the entire wall, ceiling, or floor section",
-                                        "2. Close-up photo directly centered on the defect",
-                                        "3. Nearby adjacent wall, ceiling, or roof area",
-                                        "4. Possible water-source area (plumbing, exterior wall, or roof drain)"
-                                    )
-                                }
-                                angleList.forEach { angle ->
-                                    Text(
-                                        text = "• $angle",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFF795548),
-                                        modifier = Modifier.padding(vertical = 1.dp)
-                                    )
+                                Text(
+                                    text = activeGeminiResult?.detectedObject ?: "Bottle / Non-construction Object",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF9F1239),
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Reason
+                                Text(
+                                    text = "Reason:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF881337)
+                                )
+                                Text(
+                                    text = activeGeminiResult?.irrelevanceReason
+                                        ?: "The uploaded image does not appear to show a building surface or visible waterproofing/construction defect.",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF4C0519),
+                                    modifier = Modifier.padding(top = 2.dp),
+                                    lineHeight = 16.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Please capture
+                                Text(
+                                    text = "Please capture:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF881337)
+                                )
+                                Text(
+                                    text = activeGeminiResult?.guidanceMessage
+                                        ?: "A clear photo of the wall, ceiling, roof, terrace, floor, bathroom, pipe area, or other suspected defective area.",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF4C0519),
+                                    modifier = Modifier.padding(top = 2.dp),
+                                    lineHeight = 16.sp
+                                )
+
+                                // Optional OCR Support
+                                if (!activeGeminiResult?.ocrDetectedText.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFECDD3)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.TextFields,
+                                                contentDescription = null,
+                                                tint = Color(0xFF9F1239),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Detected Text (OCR):",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF881337)
+                                                )
+                                                Text(
+                                                    text = activeGeminiResult!!.ocrDetectedText!!,
+                                                    fontSize = 11.sp,
+                                                    color = Color(0xFF4C0519)
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
 
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
                                     Button(
                                         onClick = { cameraLauncher.launch() },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.height(34.dp)
+                                        modifier = Modifier.weight(1f).height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48))
                                     ) {
-                                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Retake Photo", fontSize = 11.sp)
+                                        Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Retake Photo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
+
                                     OutlinedButton(
                                         onClick = { galleryLauncher.launch("image/*") },
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.height(34.dp)
+                                        modifier = Modifier.weight(1f).height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF9F1239)),
+                                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                                            brush = androidx.compose.ui.graphics.SolidColor(Color(0xFFE11D48))
+                                        )
                                     ) {
-                                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Choose Clearer Image", fontSize = 11.sp)
+                                        Icon(Icons.Default.Collections, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Upload Surface", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
-                    }
+                    } else if (activeGeminiResult?.isImageQualityInsufficient == true) {
+                        // =========================================================================
+                        // STATE 2: IMAGE QUALITY INSUFFICIENT (Section 4 of Specification)
+                        // Blurry, too dark, obstructed, inadequate resolution
+                        // =========================================================================
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFDE68A)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("insufficient_quality_card")
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFFD97706),
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Warning,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "IMAGE QUALITY INSUFFICIENT",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF92400E)
+                                        )
+                                        Text(
+                                            text = "Please capture a clearer and closer image",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFFB45309)
+                                        )
+                                    }
+                                }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = activeGeminiResult?.imageQualityMessage?.ifBlank { null }
+                                        ?: "Please capture a clearer and closer image of the suspected defective area.",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF78350F),
+                                    lineHeight = 16.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "Capture Recommendations:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF92400E)
+                                )
+                                val tips = activeGeminiResult?.suggestedAdditionalImages?.ifEmpty { null } ?: listOf(
+                                    "Ensure adequate light on the inspected wall/ceiling area",
+                                    "Center the camera closely on the suspected defect",
+                                    "Hold camera steady to avoid blur",
+                                    "Capture at a straight angle without glare or reflections"
+                                )
+                                tips.forEach { tip ->
+                                    Text(
+                                        text = "• $tip",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF78350F),
+                                        modifier = Modifier.padding(vertical = 1.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Button(
+                                        onClick = { cameraLauncher.launch() },
+                                        modifier = Modifier.weight(1f).height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
+                                    ) {
+                                        Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Retake Photo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = { galleryLauncher.launch("image/*") },
+                                        modifier = Modifier.weight(1f).height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF92400E)),
+                                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                                            brush = androidx.compose.ui.graphics.SolidColor(Color(0xFFD97706))
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.Collections, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Upload Clear Photo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    } else if (activeGeminiResult?.isRelevantForInspection == true && activeGeminiResult?.hasVisibleDefects == false) {
+                        // =========================================================================
+                        // STATE 3: CLEAN SURFACE / NO OBVIOUS VISIBLE DEFECT (Section 7)
+                        // Do not force a diagnosis when substrate is intact.
+                        // =========================================================================
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF86EFAC)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("clean_surface_card")
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Analytics, contentDescription = null, tint = Color(0xFF166534), modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "AI VISUAL INSPECTION REPORT",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF166534),
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+                                    Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFDCFCE7)) {
+                                        Text(
+                                            text = "NO DEFECT VISIBLE",
+                                            color = Color(0xFF15803D),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Detected Surface
+                                Surface(shape = RoundedCornerShape(8.dp), color = Color.White) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Detected Surface: ",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF166534)
+                                        )
+                                        Text(
+                                            text = activeGeminiResult?.detectedSurface ?: "Wall / Building Surface",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF14532D)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF16A34A), modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "No obvious visible defect detected.",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF14532D)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "The inspected surface appears clean, structurally sound, and shows no visible signs of active water seepage, cracking, efflorescence, or substrate deterioration. Regular periodic monitoring is recommended.",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF166534),
+                                    lineHeight = 16.sp
+                                )
+
+                                if (!activeGeminiResult?.ocrDetectedText.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = "Detected Text: ${activeGeminiResult!!.ocrDetectedText}",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF15803D)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Button(
+                                    onClick = { cameraLauncher.launch() },
+                                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A))
+                                ) {
+                                    Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Inspect Another Area", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    } else {
+                        // =========================================================================
+                        // STATE 4: GENUINE VISIBLE DEFECTS / STRUCTURED INSPECTION REPORT
+                        // =========================================================================
+
+                        // Result Header & Severity Tag
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Analytics,
+                                    contentDescription = null,
+                                    tint = FromchemPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "AI VISUAL INSPECTION REPORT",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = FromchemPrimary,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = severityColor.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = currentSeverityLevel,
+                                    color = severityColor,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Detected Surface (Section 13)
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = FromchemSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Detected Surface: ",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = FromchemTextPrimary
+                                )
+                                Text(
+                                    text = activeGeminiResult?.detectedSurface ?: currentPreset.category,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = FromchemPrimary
+                                )
+                            }
+                        }
+
+                        // Optional OCR Support (Section 8)
+                        if (!activeGeminiResult?.ocrDetectedText.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFEFF6FF),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFBFDBFE)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.TextFields,
+                                        contentDescription = null,
+                                        tint = Color(0xFF1D4ED8),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Detected Text: ",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1D4ED8)
+                                    )
+                                    Text(
+                                        text = activeGeminiResult!!.ocrDetectedText!!,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF1E3A8A)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
 
                     // Inspection Summary Card
                     Surface(
@@ -1211,7 +1614,7 @@ fun AiLeakScannerDialog(
                                         }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = defect.problemTitle,
+                                            text = "1. Defect: ${defect.problemTitle}",
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = FromchemTextPrimary
@@ -1223,7 +1626,7 @@ fun AiLeakScannerDialog(
                                         color = defectColor.copy(alpha = 0.15f)
                                     ) {
                                         Text(
-                                            text = defect.severity.uppercase(),
+                                            text = "3. Severity: ${defect.severity.uppercase()}",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = defectColor,
@@ -1249,7 +1652,7 @@ fun AiLeakScannerDialog(
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = defect.location,
+                                            text = "2. Location: ${defect.location}",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = FromchemTextSecondary
@@ -1257,9 +1660,9 @@ fun AiLeakScannerDialog(
                                     }
 
                                     Text(
-                                        text = "${defect.confidenceScore}% Visual Certainty",
+                                        text = "4. Confidence: ${defect.confidenceScore}%",
                                         fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium,
+                                        fontWeight = FontWeight.Bold,
                                         color = FromchemAccentGreen
                                     )
                                 }
@@ -1279,7 +1682,7 @@ fun AiLeakScannerDialog(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Column {
                                         Text(
-                                            text = "Visual Evidence Observed",
+                                            text = "5. Visual Evidence:",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color(0xFF0284C7)
@@ -1305,7 +1708,7 @@ fun AiLeakScannerDialog(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Column {
                                         Text(
-                                            text = "Likely Cause (Visual Hypothesis)",
+                                            text = "6. Possible Cause (Hidden origin unconfirmed):",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color(0xFFF57C00)
@@ -1331,7 +1734,7 @@ fun AiLeakScannerDialog(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Column {
                                         Text(
-                                            text = "Recommended Remedial Action",
+                                            text = "7. Recommended Action:",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = FromchemAccentGreen
@@ -1367,7 +1770,7 @@ fun AiLeakScannerDialog(
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
                                             Text(
-                                                text = "MATCHED FROMCHEM SOLUTION",
+                                                text = "8. RECOMMENDED FROMCHEM SOLUTION",
                                                 fontSize = 8.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = FromchemPrimary,
@@ -1468,6 +1871,7 @@ fun AiLeakScannerDialog(
                             Text("Request Inspection", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
+                }
                 }
             }
         }
