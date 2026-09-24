@@ -8,9 +8,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,14 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.PhotoCamera
-
 @Composable
 fun HeroSection(
-    onExploreSolutionsClicked: () -> Unit,
     onViewCaseStudiesClicked: () -> Unit = {},
-    onAiCameraScanClicked: () -> Unit = {},
+    onScanLeakClicked: () -> Unit = {},
     isWideScreen: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -49,10 +46,7 @@ fun HeroSection(
             ) {
                 // Left Text Content
                 Column(modifier = Modifier.weight(1f)) {
-                    HeroTextContent(
-                        onExploreSolutionsClicked = onExploreSolutionsClicked,
-                        onAiCameraScanClicked = onAiCameraScanClicked
-                    )
+                    HeroTextContent(onScanLeakClicked = onScanLeakClicked)
                 }
                 // Right Hero Graphic
                 Box(modifier = Modifier.weight(1f)) {
@@ -64,10 +58,7 @@ fun HeroSection(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                HeroTextContent(
-                    onExploreSolutionsClicked = onExploreSolutionsClicked,
-                    onAiCameraScanClicked = onAiCameraScanClicked
-                )
+                HeroTextContent(onScanLeakClicked = onScanLeakClicked)
                 HeroWorkerGraphic()
             }
         }
@@ -76,13 +67,12 @@ fun HeroSection(
 
 @Composable
 private fun HeroTextContent(
-    onExploreSolutionsClicked: () -> Unit,
-    onAiCameraScanClicked: () -> Unit
+    onScanLeakClicked: () -> Unit = {}
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Top ISO Badge & AI Leak Inspector Badge
+        // Top ISO Badge
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -145,116 +135,61 @@ private fun HeroTextContent(
             lineHeight = 22.sp
         )
 
-        // AI Camera Leak Scanner Hero Banner CTA Card
+        // AI Leak Detector Quick Action
         Surface(
-            onClick = onAiCameraScanClicked,
+            onClick = onScanLeakClicked,
             shape = RoundedCornerShape(16.dp),
-            color = FromchemPrimaryContainer,
-            border = androidx.compose.foundation.BorderStroke(1.dp, FromchemPrimary.copy(alpha = 0.3f)),
+            color = FromchemPrimary,
+            shadowElevation = 3.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("hero_ai_camera_banner")
+                .padding(top = 4.dp)
+                .clickable { onScanLeakClicked() }
+                .testTag("hero_leak_detector_button")
         ) {
             Row(
-                modifier = Modifier.padding(14.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = FromchemPrimary,
-                        modifier = Modifier.size(40.dp)
+                        color = Color.White.copy(alpha = 0.2f),
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "AI Camera Leak Inspector",
+                                contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "AI Leak Detector Camera",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = FromchemPrimary
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = FromchemAccentGreen
-                            ) {
-                                Text(
-                                    text = "NEW",
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
                         Text(
-                            text = "Auto-detects wall cracks, moisture, ceiling leaks, or dampness",
+                            text = "AI Leak Detector",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Scan wall / ceiling for defect diagnosis",
                             fontSize = 11.sp,
-                            color = FromchemTextSecondary
+                            color = Color.White.copy(alpha = 0.85f)
                         )
                     }
                 }
-
                 Icon(
                     imageVector = Icons.Default.ArrowForward,
-                    contentDescription = "Scan Now",
-                    tint = FromchemPrimary,
+                    contentDescription = null,
+                    tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Action Buttons Row
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Primary Explore Solutions Button
-            Button(
-                onClick = onExploreSolutionsClicked,
-                modifier = Modifier
-                    .testTag("explore_solutions_button")
-                    .height(46.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = FromchemPrimary,
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(24.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Explore Solutions",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = "Arrow Forward",
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
             }
         }
     }

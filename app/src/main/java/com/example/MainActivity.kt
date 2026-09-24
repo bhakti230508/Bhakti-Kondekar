@@ -23,10 +23,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.ChemicalProduct
 import com.example.ui.components.*
 import com.example.ui.theme.FromchemBackground
 import com.example.ui.theme.FromchemPrimary
 import com.example.ui.theme.FromchemTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,14 +54,15 @@ fun FromchemApp() {
     var selectedTab by remember { mutableStateOf("Services") }
     var showQuoteModal by remember { mutableStateOf(false) }
     var showChatModal by remember { mutableStateOf(false) }
+    var showLeakDetectorModal by remember { mutableStateOf(false) }
     var showContactModal by remember { mutableStateOf(false) }
     var showLoginModal by remember { mutableStateOf(false) }
     var showProfileModal by remember { mutableStateOf(false) }
-    var showAiCameraModal by remember { mutableStateOf(false) }
     var currentUser by remember { mutableStateOf<UserProfile?>(null) }
     var selectedCardForLearnMore by remember { mutableStateOf<String?>(null) }
 
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -105,10 +108,25 @@ fun FromchemApp() {
                     selectedTab = selectedTab,
                     onTabSelected = { tab ->
                         selectedTab = tab
-                        if (tab == "Contact") {
-                            showContactModal = true
-                        } else {
-                            Toast.makeText(context, "Navigated to $tab", Toast.LENGTH_SHORT).show()
+                        when (tab) {
+                            "Contact" -> {
+                                showContactModal = true
+                            }
+                            "Products" -> {
+                                coroutineScope.launch {
+                                    scrollState.animateScrollTo(360)
+                                }
+                                Toast.makeText(context, "Navigated to Products Catalog", Toast.LENGTH_SHORT).show()
+                            }
+                            "Projects" -> {
+                                coroutineScope.launch {
+                                    scrollState.animateScrollTo(1400)
+                                }
+                                Toast.makeText(context, "Navigated to Project Gallery", Toast.LENGTH_SHORT).show()
+                            }
+                            else -> {
+                                Toast.makeText(context, "Navigated to $tab", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
                     onGetQuoteClicked = { showQuoteModal = true },
@@ -125,7 +143,8 @@ fun FromchemApp() {
                         } else {
                             showProfileModal = true
                         }
-                    }
+                    },
+                    onScanLeakClicked = { showLeakDetectorModal = true }
                 )
 
                 // Main Page Width Container (Centered with max width on ultra-wide screens)
@@ -140,18 +159,28 @@ fun FromchemApp() {
                     ) {
                         // 1. Hero Section
                         HeroSection(
-                            onExploreSolutionsClicked = {
+                            onScanLeakClicked = { showLeakDetectorModal = true },
+                            isWideScreen = isDesktopViewOverride
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // 2. Chemical Waterproofing Products & TDS Specification Catalog
+                        ChemicalProductCatalogSection(
+                            onRequestQuoteForProduct = { product ->
                                 showQuoteModal = true
-                            },
-                            onAiCameraScanClicked = {
-                                showAiCameraModal = true
+                                Toast.makeText(
+                                    context,
+                                    "Requesting Quote for ${product.name}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             },
                             isWideScreen = isDesktopViewOverride
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // 2. Our Expertise Section
+                        // 3. Our Expertise Section
                         OurExpertiseSection(
                             onCardClicked = { card ->
                                 selectedCardForLearnMore = card.title
@@ -256,6 +285,16 @@ fun FromchemApp() {
                 )
             }
 
+            if (showLeakDetectorModal) {
+                AILeakDetectorDialog(
+                    onDismiss = { showLeakDetectorModal = false },
+                    onRequestQuoteForSolution = { solution, defectTitle ->
+                        showQuoteModal = true
+                        Toast.makeText(context, "Quote request initiated for $solution", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+
             selectedCardForLearnMore?.let { title ->
                 LearnMoreDialog(
                     cardTitle = title,
@@ -283,21 +322,6 @@ fun FromchemApp() {
                         showProfileModal = false
                         Toast.makeText(context, "Signed out successfully", Toast.LENGTH_SHORT).show()
                     }
-                )
-            }
-
-            if (showAiCameraModal) {
-                AiLeakScannerDialog(
-                    onDismiss = { showAiCameraModal = false },
-                    onRequestInspection = { issue, solution ->
-                        showQuoteModal = true
-                        Toast.makeText(
-                            context,
-                            "AI Diagnostic ($issue) attached to Quote Request!",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    },
-                    currentUser = currentUser
                 )
             }
         }

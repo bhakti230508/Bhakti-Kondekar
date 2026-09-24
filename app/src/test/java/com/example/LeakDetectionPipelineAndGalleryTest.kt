@@ -185,4 +185,73 @@ class LeakDetectionPipelineAndGalleryTest {
         assertTrue(analyzedDefect.likelyCause.isNotEmpty())
         assertTrue(analyzedDefect.recommendedAction.isNotEmpty())
     }
+
+    @Test
+    fun testLeakDetection_pipeline_bottleIrrelevantCheck() {
+        val result = com.example.ai.GeminiChatService.getDefaultLeakAnalysis("bottle on table")
+        assertFalse("Bottle must be rejected by relevance check", result.isRelevantForInspection)
+        assertEquals("Bottle", result.detectedObject)
+        assertEquals("IMAGE NOT SUITABLE FOR LEAK DETECTION", result.detectedIssue)
+        assertTrue("No defects should be diagnosed for bottle", result.defects.isEmpty())
+        assertFalse("Must not mention seepage or waterproofing failure for bottle", result.summary.contains("seepage", ignoreCase = true))
+    }
+
+    @Test
+    fun testLeakDetection_pipeline_wallCrackMatchesFromchemSolution() {
+        val result = com.example.ai.GeminiChatService.getDefaultLeakAnalysis("wall crack")
+        assertTrue("Wall crack image is relevant", result.isRelevantForInspection)
+        assertTrue("Visible defect must be reported", result.hasVisibleDefects)
+        assertFalse("Defects list must not be empty", result.defects.isEmpty())
+        val defect = result.defects.first()
+        assertEquals("WALL CRACK", defect.shortLabel)
+        assertTrue(defect.fromchemSolution.contains("Crack Paste", ignoreCase = true))
+        assertTrue(defect.likelyCause.contains("cannot be confirmed from this image alone", ignoreCase = true))
+    }
+
+    @Test
+    fun testLeakDetection_pipeline_wallDampnessMatchesFromchemSolution() {
+        val result = com.example.ai.GeminiChatService.getDefaultLeakAnalysis("wall dampness")
+        assertTrue("Wall dampness image is relevant", result.isRelevantForInspection)
+        assertTrue("Visible defect must be reported", result.hasVisibleDefects)
+        val defect = result.defects.first()
+        assertEquals("DAMPNESS", defect.shortLabel)
+        assertTrue(defect.fromchemSolution.contains("SBR Coating", ignoreCase = true))
+    }
+
+    @Test
+    fun testLeakDetection_pipeline_ceilingLeakMatchesFromchemSolution() {
+        val result = com.example.ai.GeminiChatService.getDefaultLeakAnalysis("ceiling leakage")
+        assertTrue("Ceiling leak is relevant", result.isRelevantForInspection)
+        val defect = result.defects.first()
+        assertEquals("CEILING LEAKAGE", defect.shortLabel)
+        assertTrue(defect.fromchemSolution.contains("Elastomeric", ignoreCase = true) || defect.fromchemSolution.contains("2-K", ignoreCase = true))
+    }
+
+    @Test
+    fun testLeakDetection_pipeline_terraceLeakMatchesPolyurea() {
+        val result = com.example.ai.GeminiChatService.getDefaultLeakAnalysis("terrace damage")
+        assertTrue("Terrace leak is relevant", result.isRelevantForInspection)
+        val defect = result.defects.first()
+        assertEquals("TERRACE/ROOF LEAKAGE", defect.shortLabel)
+        assertTrue(defect.fromchemSolution.contains("Pure Polyurea", ignoreCase = true))
+    }
+
+    @Test
+    fun testLeakDetection_pipeline_multipleDefectsDetected() {
+        val result = com.example.ai.GeminiChatService.getDefaultLeakAnalysis("multiple defects on wall")
+        assertTrue("Image is relevant", result.isRelevantForInspection)
+        assertTrue("Defects count should be multiple", result.defects.size >= 2)
+        val labels = result.defects.map { it.shortLabel }
+        assertTrue(labels.contains("WALL CRACK"))
+        assertTrue(labels.contains("DAMPNESS"))
+    }
+
+    @Test
+    fun testLeakDetection_pipeline_blurryImageQualityInsufficient() {
+        val result = com.example.ai.GeminiChatService.getDefaultLeakAnalysis("blurry underexposed image")
+        assertTrue("Quality must be insufficient", result.isImageQualityInsufficient)
+        assertEquals("IMAGE QUALITY INSUFFICIENT", result.detectedIssue)
+        assertTrue(result.imageQualityMessage?.contains("clearer and closer") == true)
+        assertTrue("No diagnosis should be invented for low quality image", result.defects.isEmpty())
+    }
 }

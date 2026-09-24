@@ -1026,6 +1026,31 @@ object GeminiChatService {
     fun getDefaultLeakAnalysis(contextDescription: String = ""): GeminiLeakAnalysisResult {
         val q = contextDescription.lowercase()
 
+        // 1. Image Quality Check
+        if (q.contains("blurry") || q.contains("dark") || q.contains("unclear") || q.contains("insufficient")) {
+            return GeminiLeakAnalysisResult(
+                isImageQualityInsufficient = true,
+                imageQualityMessage = "Please capture a clearer and closer image of the suspected defective area.",
+                suggestedAdditionalImages = listOf(
+                    "1. Wide overview showing the entire wall, ceiling, or floor section",
+                    "2. Close-up photo directly centered on the defect",
+                    "3. Nearby adjacent wall, ceiling, or roof area",
+                    "4. Possible water-source area (plumbing, exterior wall, or roof drain)"
+                ),
+                detectedIssue = "IMAGE QUALITY INSUFFICIENT",
+                recommendedApplication = "Re-capture in Adequate Lighting",
+                suggestedNextStep = "Please capture a clearer and closer image of the suspected defective area.",
+                severityLevel = "Low Risk",
+                chemicalSpec = "N/A - Retake Recommended",
+                summary = "Image quality is insufficient for a reliable inspection. Please capture a clearer and closer image of the suspected defective area.",
+                isSuccess = false,
+                defectCategory = "Image Quality Insufficient",
+                confidence = "15% Certainty",
+                defects = emptyList()
+            )
+        }
+
+        // 2. Image Relevance Check (Irrelevant Objects)
         val irrelevantKeywords = listOf(
             "bottle", "water bottle", "waterbottle", "plastic bottle", "glass bottle", "beverage", "drink", "soda",
             "coke", "pepsi", "sprite", "fanta", "aquafina", "bisleri", "kinley", "mineral water", "packaged drinking water",
@@ -1060,6 +1085,84 @@ object GeminiChatService {
         }
 
         return when {
+            q.contains("multiple") -> {
+                val defects = listOf(
+                    DetectedDefect(
+                        id = "defect_mult_1",
+                        problemTitle = "Substrate Fracture & Wall Crack",
+                        shortLabel = "WALL CRACK",
+                        location = "Center of wall along masonry junction",
+                        severity = "MODERATE",
+                        confidenceScore = 93,
+                        visualEvidence = "High-contrast continuous linear fracture splitting plaster plane.",
+                        likelyCause = "Substrate settlement or thermal expansion (exact cause cannot be confirmed from this image alone).",
+                        recommendedAction = "Chisel V-groove profile, clear debris, and pack with elastic crack paste.",
+                        fromchemSolution = "Crack Paste (Fromchem Polymeric Waterproofing Crack Paste)",
+                        fromchemProductSpec = "High-Elasticity Polymeric Crack Filler with 300% Elongation",
+                        boundingBox = DefectBoundingBox(0.12f, 0.40f, 0.65f, 0.60f)
+                    ),
+                    DetectedDefect(
+                        id = "defect_mult_2",
+                        problemTitle = "Wall Seepage & Capillary Rising Dampness",
+                        shortLabel = "DAMPNESS",
+                        location = "Lower section of wall along skirting",
+                        severity = "HIGH",
+                        confidenceScore = 95,
+                        visualEvidence = "Dark, saturated moisture tide-line and blistering paint along baseboard.",
+                        likelyCause = "Capillary ground moisture penetration or plumbing line transit.",
+                        recommendedAction = "Scrape peeling plaster and apply deep-penetrating SBR damp barrier.",
+                        fromchemSolution = "SBR Coating or Epoxy or PU (Fromchem Damp-Proofing System)",
+                        fromchemProductSpec = "Styrene-Butadiene Rubber (SBR) Slurry & Epoxy Barrier",
+                        boundingBox = DefectBoundingBox(0.60f, 0.10f, 0.95f, 0.90f)
+                    )
+                )
+                GeminiLeakAnalysisResult(
+                    isRelevantForInspection = true,
+                    detectedSurface = "Wall",
+                    hasVisibleDefects = true,
+                    detectedIssue = "Multiple Visible Deficiencies: Wall Crack & Capillary Dampness",
+                    recommendedApplication = "Crack Paste + SBR Moisture Barrier System",
+                    suggestedNextStep = "Repair structural fissure with Crack Paste, then seal damp lower wall with SBR coating.",
+                    severityLevel = "High Urgency",
+                    chemicalSpec = "Polymeric Crack Paste & SBR Latex Slurry",
+                    summary = "Multiple defects detected across the wall plane: a vertical settlement crack and lower capillary rising dampness. Separate remediation required for both structural sealing and moisture damp-proofing.",
+                    defectCategory = "Multiple Defects",
+                    confidence = "94% Visual Certainty",
+                    defects = defects
+                )
+            }
+            q.contains("terrace") || q.contains("roof") -> {
+                val defects = listOf(
+                    DetectedDefect(
+                        id = "defect_terrace_1",
+                        problemTitle = "Terrace Membrane Deterioration & Standing Ponding",
+                        shortLabel = "TERRACE/ROOF LEAKAGE",
+                        location = "Terrace floor slab and parapet junction",
+                        severity = "HIGH",
+                        confidenceScore = 95,
+                        visualEvidence = "Visible weathering, peeling of surface membrane, and dark ponding dirt marks along terrace slab.",
+                        likelyCause = "UV weathering degradation and inadequate drainage slope causing thermal expansion cracking (exact source requires flood testing).",
+                        recommendedAction = "Pressure-wash substrate, level slopes towards drains, and spray seamless pure polyurea membrane.",
+                        fromchemSolution = "Fromchem Pure Polyurea 2000 / Elastomeric Rubber Coating",
+                        fromchemProductSpec = "100% Solids Pure Polyurea Seamless Spray Elastomer (420% Elongation, 25-Year Warranty)",
+                        boundingBox = DefectBoundingBox(0.20f, 0.15f, 0.85f, 0.85f)
+                    )
+                )
+                GeminiLeakAnalysisResult(
+                    isRelevantForInspection = true,
+                    detectedSurface = "Terrace / Roof",
+                    hasVisibleDefects = true,
+                    detectedIssue = "Terrace Membrane Deterioration & Thermal Weathering",
+                    recommendedApplication = "Fromchem Pure Polyurea 2000 / Elastomeric Rubber Coating",
+                    suggestedNextStep = "Apply High-Build Seamless Pure Polyurea Membrane",
+                    severityLevel = "Severe Risk",
+                    chemicalSpec = "100% Solids Fast-Curing Polyurea Elastomer",
+                    summary = "Terrace weathering and ponding moisture deterioration detected. Seamless Fromchem Pure Polyurea 2000 provides monolithic UV-impervious protection with zero joints.",
+                    defectCategory = "Terrace / Roof Leakage",
+                    confidence = "95% Visual Certainty",
+                    defects = defects
+                )
+            }
             q.contains("basement") -> {
                 val defects = listOf(
                     DetectedDefect(
@@ -1208,7 +1311,7 @@ object GeminiChatService {
                         severity = "MODERATE",
                         confidenceScore = 95,
                         visualEvidence = "Continuous linear fracture splitting plaster and substrate.",
-                        likelyCause = "Substrate settlement or seasonal thermal expansion and contraction (recommend monitoring for growth).",
+                        likelyCause = "Substrate settlement or thermal expansion stresses (exact cause cannot be confirmed from this image alone).",
                         recommendedAction = "Chisel V-groove profile (approx 5mm x 5mm), blow out debris, and apply high-elasticity crack paste.",
                         fromchemSolution = "Crack Paste (Fromchem Polymeric Waterproofing Crack Paste)",
                         fromchemProductSpec = "Polymeric Waterproofing Crack Paste with High Elasticity",

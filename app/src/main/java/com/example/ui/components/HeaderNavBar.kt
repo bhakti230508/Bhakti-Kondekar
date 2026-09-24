@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.CameraAlt
 
 @Composable
 fun HeaderNavBar(
@@ -37,6 +38,7 @@ fun HeaderNavBar(
     onToggleDesktopMode: () -> Unit,
     currentUser: UserProfile? = null,
     onAccountClicked: () -> Unit,
+    onScanLeakClicked: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -73,7 +75,7 @@ fun HeaderNavBar(
                         .padding(horizontal = 6.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val navItems = listOf("Services", "Projects", "About", "Contact")
+                    val navItems = listOf("Services", "Products", "Projects", "About", "Contact")
                     navItems.forEach { item ->
                         val isSelected = selectedTab == item
                         Box(
@@ -111,6 +113,37 @@ fun HeaderNavBar(
                         tint = FromchemPrimary,
                         modifier = Modifier.size(18.dp)
                     )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // AI Leak Detector Button
+                Surface(
+                    onClick = onScanLeakClicked,
+                    shape = RoundedCornerShape(20.dp),
+                    color = FromchemPrimary,
+                    modifier = Modifier
+                        .height(36.dp)
+                        .testTag("header_leak_detector_button")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = "Scan Leak",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = if (isDesktopMode) "AI Leak Detector" else "Scan",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))

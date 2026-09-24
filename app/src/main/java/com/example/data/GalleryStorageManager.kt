@@ -95,9 +95,9 @@ object GalleryStorageManager {
             for (i in 0 until jsonArray.length()) {
                 val obj = jsonArray.getJSONObject(i)
 
-                val beforeUriStr = obj.optString("userUploadedBeforeUri", null)
-                val afterUriStr = obj.optString("userUploadedAfterUri", null)
-                val compUriStr = obj.optString("userUploadedComparisonUri", null)
+                val beforeUriStr = if (obj.has("userUploadedBeforeUri")) obj.getString("userUploadedBeforeUri") else null
+                val afterUriStr = if (obj.has("userUploadedAfterUri")) obj.getString("userUploadedAfterUri") else null
+                val compUriStr = if (obj.has("userUploadedComparisonUri")) obj.getString("userUploadedComparisonUri") else null
 
                 val multiUrisArray = obj.optJSONArray("userUploadedOriginalUris")
                 val multiUris = mutableListOf<Uri>()
@@ -133,7 +133,7 @@ object GalleryStorageManager {
                     userUploadedBeforeUri = if (!beforeUriStr.isNullOrBlank()) Uri.parse(beforeUriStr) else null,
                     userUploadedAfterUri = if (!afterUriStr.isNullOrBlank()) Uri.parse(afterUriStr) else null,
                     userUploadedComparisonUri = if (!compUriStr.isNullOrBlank()) Uri.parse(compUriStr) else null,
-                    originalImageUrl = obj.optString("originalImageUrl", null)
+                    originalImageUrl = if (obj.has("originalImageUrl")) obj.getString("originalImageUrl") else null
                 )
                 projects.add(project)
             }
