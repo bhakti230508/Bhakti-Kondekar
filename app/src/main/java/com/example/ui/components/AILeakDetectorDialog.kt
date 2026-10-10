@@ -619,6 +619,21 @@ private fun QualityInsufficientCard(result: GeminiLeakAnalysisResult) {
 
 @Composable
 private fun IrrelevantImageCard(result: GeminiLeakAnalysisResult) {
+    val objLower = result.detectedObject?.lowercase() ?: ""
+    val isBottle = objLower.contains("bottle")
+    val isPerson = objLower.contains("face") || objLower.contains("person") || objLower.contains("human") || objLower.contains("selfie")
+
+    val observationText = when {
+        isBottle -> "The image appears to show a bottle or unrelated object rather than a building defect."
+        isPerson -> "The image does not show a recognizable building/construction defect."
+        else -> result.irrelevanceReason ?: "The image does not contain a visible building or construction-related defect."
+    }
+
+    val requestInstructionText = when {
+        isPerson -> "Please point the camera toward the damaged area of the building."
+        else -> "Please capture a clear photograph of the affected wall, roof, terrace, ceiling, floor, tile, pipe, or other damaged area."
+    }
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFFF8FAFC),
@@ -640,10 +655,10 @@ private fun IrrelevantImageCard(result: GeminiLeakAnalysisResult) {
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "IMAGE NOT SUITABLE FOR LEAK DETECTION",
-                    fontSize = 13.sp,
+                    text = "⚠️ No building defect detected.",
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF1E293B)
+                    color = Color(0xFF0F172A)
                 )
             }
 
@@ -660,7 +675,7 @@ private fun IrrelevantImageCard(result: GeminiLeakAnalysisResult) {
                         color = Color(0xFF64748B)
                     )
                     Text(
-                        text = result.detectedObject ?: "Unrelated Object (e.g. Bottle)",
+                        text = result.detectedObject ?: "Unrelated Object",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A)
@@ -670,14 +685,14 @@ private fun IrrelevantImageCard(result: GeminiLeakAnalysisResult) {
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "REASON:",
+                    text = "OBSERVATION:",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF64748B)
                 )
                 Text(
-                    text = result.irrelevanceReason ?: "The image does not show a relevant building/construction surface or visible waterproofing defect.",
-                    fontSize = 12.sp,
+                    text = observationText,
+                    fontSize = 13.sp,
                     color = Color(0xFF334155),
                     lineHeight = 18.sp
                 )
@@ -693,8 +708,8 @@ private fun IrrelevantImageCard(result: GeminiLeakAnalysisResult) {
                     color = FromchemPrimary
                 )
                 Text(
-                    text = "A clear photo of the wall, ceiling, roof, terrace, floor, bathroom, pipe area, or suspected leakage/dampness area.",
-                    fontSize = 12.sp,
+                    text = requestInstructionText,
+                    fontSize = 13.sp,
                     color = FromchemTextPrimary,
                     lineHeight = 18.sp
                 )
@@ -726,30 +741,23 @@ private fun CleanSurfaceCard(result: GeminiLeakAnalysisResult) {
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "AI INSPECTION REPORT - CLEAN SURFACE",
-                    fontSize = 13.sp,
+                    text = "No visible defect",
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color(0xFF166534)
                 )
             }
 
             Text(
-                text = "Detected Surface: ${result.detectedSurface}",
+                text = "Inspected Substrate: ${result.detectedSurface}",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Color(0xFF14532D)
             )
 
             Text(
-                text = result.noDefectMessage ?: "No obvious visible defect detected.",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF15803D)
-            )
-
-            Text(
-                text = "The inspected surface appears clean and structurally intact with no signs of active water ingress, cracks, efflorescence, or peeling. Regular preventative maintenance recommended.",
-                fontSize = 12.sp,
+                text = result.noDefectMessage ?: "The inspected surface appears clean and structurally intact with no visible signs of water leakage, cracking, efflorescence, or peeling paint.",
+                fontSize = 13.sp,
                 color = Color(0xFF166534),
                 lineHeight = 18.sp
             )
@@ -784,7 +792,7 @@ private fun DefectReportCard(
             ) {
                 Column {
                     Text(
-                        text = "AI INSPECTION REPORT",
+                        text = "VISUAL INSPECTION ENGINE REPORT",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = FromchemPrimary,
@@ -876,40 +884,20 @@ private fun DefectDetailCard(
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Defect Header
+            // 🔍 DETECTED PROBLEM
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = severityColor,
-                        modifier = Modifier.size(20.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "$index",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                    Text(
-                        text = defect.problemTitle,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A)
-                    )
-                }
+                Text(
+                    text = "🔍 DETECTED PROBLEM:",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF64748B)
+                )
 
                 Surface(
                     shape = RoundedCornerShape(6.dp),
@@ -925,87 +913,64 @@ private fun DefectDetailCard(
                 }
             }
 
-            // Location & Confidence
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Place,
-                        contentDescription = null,
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Text(
-                        text = defect.location,
-                        fontSize = 11.sp,
-                        color = Color(0xFF475569),
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                Text(
-                    text = "${defect.confidenceScore}% Visual Confidence",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FromchemPrimary
-                )
-            }
+            Text(
+                text = defect.problemTitle,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
+            )
 
             HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 0.8.dp)
 
-            // Visual Evidence
+            // 📍 LOCATION
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = "VISUAL EVIDENCE:",
-                    fontSize = 9.sp,
+                    text = "📍 LOCATION:",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF64748B)
+                )
+                Text(
+                    text = defect.location,
+                    fontSize = 13.sp,
+                    color = Color(0xFF1E293B),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            // 📝 VISUAL OBSERVATION
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "📝 VISUAL OBSERVATION:",
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF64748B)
                 )
                 Text(
                     text = defect.visualEvidence,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     color = Color(0xFF1E293B),
-                    lineHeight = 16.sp
+                    lineHeight = 18.sp
                 )
             }
 
-            // Likely Cause
+            // ⚠️ POSSIBLE CAUSE
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = "POSSIBLE CAUSE:",
-                    fontSize = 9.sp,
+                    text = "⚠️ POSSIBLE CAUSE:",
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF64748B)
                 )
                 Text(
                     text = defect.likelyCause,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     color = Color(0xFF475569),
-                    lineHeight = 16.sp
+                    lineHeight = 18.sp
                 )
             }
 
-            // Recommended Action
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = "RECOMMENDED ACTION:",
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF64748B)
-                )
-                Text(
-                    text = defect.recommendedAction,
-                    fontSize = 12.sp,
-                    color = Color(0xFF1E293B),
-                    lineHeight = 16.sp
-                )
-            }
-
-            // FromChem Matched Solution Card
+            // 🛠️ RECOMMENDED SOLUTION
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = Color(0xFFF8FAFC),
@@ -1013,26 +978,15 @@ private fun DefectDetailCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Science,
-                            contentDescription = null,
-                            tint = FromchemPrimary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "RECOMMENDED FROMCHEM SOLUTION:",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = FromchemPrimary
-                        )
-                    }
+                    Text(
+                        text = "🛠️ RECOMMENDED SOLUTION:",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FromchemPrimary
+                    )
 
                     Text(
                         text = defect.fromchemSolution,
@@ -1041,11 +995,28 @@ private fun DefectDetailCard(
                         color = Color(0xFF0F172A)
                     )
 
+                    if (defect.fromchemProductSpec.isNotBlank()) {
+                        Text(
+                            text = defect.fromchemProductSpec,
+                            fontSize = 11.sp,
+                            color = Color(0xFF475569),
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    // 🔧 APPLICATION
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = defect.fromchemProductSpec,
-                        fontSize = 11.sp,
-                        color = Color(0xFF475569),
-                        lineHeight = 15.sp
+                        text = "🔧 APPLICATION:",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FromchemPrimary
+                    )
+                    Text(
+                        text = defect.applicationInstructions,
+                        fontSize = 12.sp,
+                        color = Color(0xFF334155),
+                        lineHeight = 16.sp
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1068,6 +1039,67 @@ private fun DefectDetailCard(
                             text = "Request Quote for this Solution",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // 📊 CONFIDENCE
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "📊 CONFIDENCE: ",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B)
+                    )
+                    Text(
+                        text = defect.confidenceLevel,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = when (defect.confidenceLevel.lowercase()) {
+                            "high" -> Color(0xFF15803D)
+                            "medium" -> Color(0xFFD97706)
+                            else -> Color(0xFFDC2626)
+                        }
+                    )
+                }
+
+                Text(
+                    text = "${defect.confidenceScore}% Visual Confidence",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF64748B)
+                )
+            }
+
+            // 📸 FOR BETTER DETECTION (Only if present)
+            if (!defect.forBetterDetection.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFFFBEB),
+                    border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = "📸 FOR BETTER DETECTION:",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF92400E)
+                        )
+                        Text(
+                            text = defect.forBetterDetection,
+                            fontSize = 12.sp,
+                            color = Color(0xFF78350F),
+                            lineHeight = 16.sp
                         )
                     }
                 }
